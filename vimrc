@@ -1,4 +1,4 @@
-" gmclean's .vimrc
+" LeanMC's .vimrc
 " I'll try to be as clear, concise, and cogent as I can
 
 " Set tab and indent to four spaces, make tab keypress insert space characters

@@ -19,8 +19,8 @@ set wildmenu
 " Show partial commands in last line of screen
 set showcmd
 
-" Highlight searches
-set hlsearch
+" Highlight searches and search as you type
+set hlsearch incsearch
 
 " Make searches ignore case, except when capital letters are used
 set ignorecase smartcase
@@ -55,7 +55,8 @@ set mouse=a
 " Set command window to 2 lines, so you don't have to press <Enter> so much
 set cmdheight=2
 
-" Line numbers!
+" Unobtrusive line numbers!
+hi LineNr ctermbg=darkgray ctermfg=gray
 set number
 
 " Pasting can be a pain in the ass, but so is setting and unsetting paste.
@@ -67,3 +68,7 @@ set colorcolumn=80
 
 " But let me go past 80 if I want to
 set textwidth=0
+
+" Highlight current line with a dark gray background
+hi CursorLine cterm=NONE ctermbg=darkgray
+set cursorline

@@ -31,6 +31,9 @@ set backspace=indent,eol,start
 " Autoindent
 set autoindent
 
+" Smart indent
+set smartindent
+
 " Don't always go to the first non-blank (keep current column)
 set nostartofline
 
@@ -59,4 +62,8 @@ set number
 " This makes that hassle a simple press of F11
 set pastetoggle=<F11>
 
+" Highlight 80th column, to avoid excessively long lines of code and whatnot
+set colorcolumn=80
 
+" But let me go past 80 if I want to
+set textwidth=0

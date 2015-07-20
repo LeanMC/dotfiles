@@ -1,4 +1,4 @@
-" LeanMC's .vimrc
+" LeanMC's .vimrc!
 " I'll try to be as clear, concise, and cogent as I can
 
 " Set tab and indent to four spaces, make tab keypress insert space characters
@@ -7,8 +7,10 @@ set tabstop=4 shiftwidth=4 expandtab
 " Attempt to detect type of file based on name and contents
 filetype indent plugin on
 
-" Enable syntax highlighting
-syntax on
+" Enable syntax highlighting and the excellent solarized colorscheme
+syntax enable
+set background=dark
+colorscheme solarized
 
 " Allow switching from unsaved buffers, disabled for now in favor of split/vsplit
 " set hidden
@@ -55,8 +57,7 @@ set mouse=a
 " Set command window to 2 lines, so you don't have to press <Enter> so much
 set cmdheight=2
 
-" Unobtrusive line numbers!
-hi LineNr ctermbg=darkgray ctermfg=gray
+" Line numbers!
 set number
 
 " Pasting can be a pain in the ass, but so is setting and unsetting paste.
@@ -70,5 +71,4 @@ set colorcolumn=80
 set textwidth=0
 
 " Highlight current line with a dark gray background
-hi CursorLine cterm=NONE ctermbg=darkgray
 set cursorline

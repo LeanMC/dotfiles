@@ -1,0 +1,247 @@
+* early-init.el
+
+** Frame Size
+I like to have a decently large window.
+
+#+begin_src emacs-lisp :tangle "early-init.el"
+  (dolist (var '((left . 0.1)
+		 (top . 0.1)
+		 (width . 0.6)
+		 (height . 0.6)))
+    (add-to-list 'default-frame-alist var))
+#+end_src
+
+
+** package.el Configuration and Loading
+
+I also like having all my package info loaded.
+
+#+begin_src emacs-lisp :tangle "early-init.el"
+  (require 'package)
+  (add-to-list 'package-archives '("melpa" . "https://melpa.org/packages/") t)
+  (package-initialize)
+  (setq package-enable-at-startup t)
+#+end_src
+
+
+* init.el
+
+** macOS Modifier Keys
+On Macs, the =ns-*-modifier= commands allow for a nice way to put the
+control key under your thumbs, with meta nearby.
+
+#+begin_src emacs-lisp :tangle "init.el"
+(when (eq system-type 'darwin)
+  (setq
+   ns-command-modifier 'control
+   ns-option-modifier 'meta
+   ns-control-modifier 'super))
+#+end_src
+
+
+** Flash Modeline for Bell
+Instead of beeping audibly or flashing the entire frame, flash the
+modeline when bell-worthy actions are attempted.
+
+#+begin_src emacs-lisp :tangle "init.el"
+  (defun flash-mode-line()
+    (invert-face 'mode-line)
+    (run-with-timer 0.1 nil #'invert-face 'mode-line))
+
+  (setq visible-bell nil
+	ring-bell-function 'flash-mode-line)
+#+end_src
+
+
+** Remove the Help
+While I don't think new users should be advised to disable these
+options, I now find them more annoying than helpful.
+
+#+begin_src emacs-lisp :tangle "init.el"
+  (setq inhibit-startup-screen t)
+  (menu-bar-mode -1)
+  (scroll-bar-mode -1)
+  (tool-bar-mode -1)
+#+end_src
+
+
+** Logical Lines, Track End of Line
+I like =C-n= and =C-p= to move by logical lines, even if they are too long
+to fit the width of the window/frame. If I'm at the end of a line and
+move by line, I'd like to end up at the end of the destination line.
+
+#+begin_src emacs-lisp :tangle "init.el"
+  (setq line-move-visual nil
+	track-eol t)
+#+end_src
+
+
+** Line Numbers
+I like having relative line numbers. If I see a line I want to edit,
+relative line numbers allow me to jump there with an easy-to-find
+argument to =next-line= or =previous-line=.
+
+#+begin_src emacs-lisp :tangle "init.el"
+  (global-display-line-numbers-mode)
+  (setq display-line-numbers-type 'relative)
+#+end_src
+
+
+** Cursor Highlighting and Styling
+I like a bar cursor. To make it easier to find, I like to have it
+always blink and to highlight the line it's on.
+
+#+begin_src emacs-lisp :tangle "init.el"
+  (setq-default cursor-type 'bar)
+  (setq-default blink-cursor-blinks 0)
+  (global-hl-line-mode 1)
+#+end_src
+
+
+** Completion
+So far, =fido-vertical-mode= without any alteration has provided me with
+all I need. I enjoy using =C-n= and =C-p= to navigate completion options,
+and most of the time the fuzzy matching is more convenience than
+annoyance.
+
+#+begin_src emacs-lisp :tangle "init.el"
+  (fido-vertical-mode 1)
+#+end_src
+
+
+** Recent Files, Save Location
+I like having a list of recent files. I like keeping my place in files
+I have edited recently.
+
+#+begin_src emacs-lisp :tangle "init.el"
+  (recentf-mode 1)
+  (use-package recentf
+      :bind ("C-x C-r" . recentf-open))
+  (save-place-mode 1)
+#+end_src
+
+
+** Electric Pair Mode
+I almost never want an unclosed bracket, curly brace, parenthesis,
+etc. Electric pair mode saves me the trouble of typing the closer.
+
+#+begin_src emacs-lisp :tangle "init.el"
+  (electric-pair-mode 1)
+#+end_src
+
+
+** Font and Ligatures
+I like the IBM Plex font. JebBrains Mono looks almost the same and has
+support for ligatures.
+
+#+begin_src emacs-lisp :tangle "init.el"
+  (set-face-font 'default "JetBrains Mono-16")
+  (set-face-font 'variable-pitch "IBM Plex Sans-16")
+
+  (use-package ligature
+    :config
+    (ligature-set-ligatures 'prog-mode '("-|" "-~" "---" "-<<" "-<" "--" "->" "->>" "-->" "///" "/=" "/=="
+					 "/>" "//" "/*" "*>" "***" "*/" "<-" "<<-" "<=>" "<=" "<|" "<||"
+					 "<|||" "<|>" "<:" "<>" "<-<" "<<<" "<==" "<<=" "<=<" "<==>" "<-|"
+					 "<<" "<~>" "<=|" "<~~" "<~" "<$>" "<$" "<+>" "<+" "</>" "</" "<*"
+					 "<*>" "<->" "<!--" ":>" ":<" ":::" "::" ":?" ":?>" ":=" "::=" "=>>"
+					 "==>" "=/=" "=!=" "=>" "===" "=:=" "==" "!==" "!!" "!=" ">]" ">:"
+					 ">>-" ">>=" ">=>" ">>>" ">-" ">=" "&&&" "&&" "|||>" "||>" "|>" "|]"
+					 "|}" "|=>" "|->" "|=" "||-" "|-" "||=" "||" ".." ".?" ".=" ".-" "..<"
+					 "..." "+++" "+>" "++" "[||]" "[<" "[|" "{|" "??" "?." "?=" "?:" "##"
+					 "###" "####" "#[" "#{" "#=" "#!" "#:" "#_(" "#_" "#?" "#(" ";;" "_|_"
+					 "__" "~~" "~~>" "~>" "~-" "~@" "$>" "^=" "]#"))
+
+    (global-ligature-mode t))
+#+end_src
+
+
+** Theme and Icons
+The theme of the moment is: Dracula.
+
+#+begin_src emacs-lisp :tangle "init.el"
+  (load-theme 'dracula t nil)
+#+end_src
+
+I want =all-the-icons=:
+
+#+begin_src emacs-lisp :tangle "init.el"
+    (use-package all-the-icons
+      :if (display-graphic-p))
+#+end_src
+
+I want icons in =dired=. I also want =dired= to hide details by default:
+
+#+begin_src emacs-lisp :tangle "init.el"
+  (add-hook 'dired-mode-hook 'all-the-icons-dired-mode)
+  (add-hook 'dired-mode-hook 'dired-hide-details-mode)
+#+end_src
+
+Finally, I want the icons in my completions:
+
+#+begin_src emacs-lisp :tangle "init.el"
+(all-the-icons-completion-mode)
+#+end_src
+
+
+** Modeline
+
+Custom, minimal modeline. Icons for edit status and major mode plus strings with buffer name and position as a percentage.
+
+#+begin_src emacs-lisp :tangle "init.el"
+	  ;; taken from https://emacs.stackexchange.com/questions/5529/how-to-right-align-some-items-in-the-modeline
+	  ;; this allows for some items to be right-justified. will be obsolete in emacs30 with mode-line-format-right-align
+	   (defun leanmc-left-right-modeline (left right)
+	   "Return a string of `window-width' length containing LEFT, and RIGHT
+	  aligned respectively."
+	   (let* ((available-width (- (window-width) (length left) 2)))
+	     (format (format " %%s %%%ds " available-width) left right)))
+
+	   (defun leanmc-modeline-icon-buffer-edit-status ()
+	     "Return a lock icon if file is read-only, link if it's unedited, or broken link if it's edited"
+	     (if buffer-read-only
+		 (propertize (format "%s" (all-the-icons-faicon "lock"))
+			     'help-echo "Read-only")
+	       (if (buffer-modified-p)
+		   (propertize (format "%s" (all-the-icons-faicon "chain-broken"))
+			       'help-echo "Edited")
+		 (propertize (format "%s" (all-the-icons-faicon "link"))
+			     'help-echo "No changes"))))
+
+	   (defun leanmc-modeline-icon-major-mode ()
+	     "Return an icon for the current major mode"
+	     (propertize (all-the-icons-icon-for-mode major-mode)
+			 'help-echo (format "%s" major-mode)
+			 'local-map mode-line-major-mode-keymap))
+
+	   ;;Bring it all together with setq-default and the :eval keyword, along with some more % constructs
+	   (setq-default mode-line-format '((:eval
+					     (leanmc-left-right-modeline
+					      (format-mode-line
+					       (concat
+						"%e "
+						(leanmc-modeline-icon-buffer-edit-status)
+						" %b"))
+					      (format-mode-line
+					       (concat
+						"%p%% "
+						(format " %s " (leanmc-modeline-icon-major-mode))))))))
+#+end_src
+
+* Org Configuration
+I like this option, which makes formatting markers (*, _, =, etc)
+disappear after they're closed and shows the styled text instead.
+
+#+begin_src emacs-lisp :tangle "init.el"
+(setq org-hide-emphasis-markers t)
+#+end_src
+
+* Magit Configuration
+Avoid confusion about where the Github token is stored.
+
+#+begin_src emacs-lisp :tangle "init.el"
+  (setq auth-sources '("~/.authinfo"))
+  (use-package forge
+    :after magit)
+#+end_src
+

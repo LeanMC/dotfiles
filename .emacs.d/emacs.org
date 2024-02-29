@@ -1,31 +1,33 @@
 * early-init.el
-
-** Frame Size
-I like to have a decently large window.
+** Frame Size and Default Font
+I like to have a decently large window. I like the JetBrains Mono
+font.
 
 #+begin_src emacs-lisp :tangle "early-init.el"
-  (dolist (var '((left . 0.1)
-		 (top . 0.1)
-		 (width . 0.6)
-		 (height . 0.6)))
-    (add-to-list 'default-frame-alist var))
+    (dolist (var '((left . 0.1)
+		   (top . 0.1)
+		   (width . 0.6)
+		   (height . 0.6)
+		   (font . "JetBrains Mono-16")))
+      (add-to-list 'default-frame-alist var))
 #+end_src
 
+** Package config
 
-** package.el Configuration and Loading
-
-I also like having all my package info loaded.
+All my package info loaded. =use-package= automatically ensuring
+packages are installed.
 
 #+begin_src emacs-lisp :tangle "early-init.el"
   (require 'package)
   (add-to-list 'package-archives '("melpa" . "https://melpa.org/packages/") t)
   (package-initialize)
   (setq package-enable-at-startup t)
+
+  (setq use-package-always-ensure t)
 #+end_src
 
 
 * init.el
-
 ** macOS Modifier Keys
 On Macs, the =ns-*-modifier= commands allow for a nice way to put the
 control key under your thumbs, with meta nearby.
@@ -37,7 +39,6 @@ control key under your thumbs, with meta nearby.
    ns-option-modifier 'meta
    ns-control-modifier 'super))
 #+end_src
-
 
 ** Flash Modeline for Bell
 Instead of beeping audibly or flashing the entire frame, flash the
@@ -52,7 +53,6 @@ modeline when bell-worthy actions are attempted.
 	ring-bell-function 'flash-mode-line)
 #+end_src
 
-
 ** Remove the Help
 While I don't think new users should be advised to disable these
 options, I now find them more annoying than helpful.
@@ -64,7 +64,6 @@ options, I now find them more annoying than helpful.
   (tool-bar-mode -1)
 #+end_src
 
-
 ** Logical Lines, Track End of Line
 I like =C-n= and =C-p= to move by logical lines, even if they are too long
 to fit the width of the window/frame. If I'm at the end of a line and
@@ -74,7 +73,6 @@ move by line, I'd like to end up at the end of the destination line.
   (setq line-move-visual nil
 	track-eol t)
 #+end_src
-
 
 ** Line Numbers
 I like having relative line numbers. If I see a line I want to edit,
@@ -86,7 +84,6 @@ argument to =next-line= or =previous-line=.
   (setq display-line-numbers-type 'relative)
 #+end_src
 
-
 ** Cursor Highlighting and Styling
 I like a bar cursor. To make it easier to find, I like to have it
 always blink and to highlight the line it's on.
@@ -96,7 +93,6 @@ always blink and to highlight the line it's on.
   (setq-default blink-cursor-blinks 0)
   (global-hl-line-mode 1)
 #+end_src
-
 
 ** Completion
 So far, =fido-vertical-mode= without any alteration has provided me with
@@ -108,18 +104,16 @@ annoyance.
   (fido-vertical-mode 1)
 #+end_src
 
-
 ** Recent Files, Save Location
 I like having a list of recent files. I like keeping my place in files
 I have edited recently.
 
 #+begin_src emacs-lisp :tangle "init.el"
-  (recentf-mode 1)
-  (use-package recentf
-      :bind ("C-x C-r" . recentf-open))
-  (save-place-mode 1)
+    (use-package recentf
+	:bind ("C-x C-r" . recentf-open)
+	:ensure nil)
+    (save-place-mode 1)
 #+end_src
-
 
 ** Electric Pair Mode
 I almost never want an unclosed bracket, curly brace, parenthesis,
@@ -129,13 +123,11 @@ etc. Electric pair mode saves me the trouble of typing the closer.
   (electric-pair-mode 1)
 #+end_src
 
-
 ** Font and Ligatures
-I like the IBM Plex font. JebBrains Mono looks almost the same and has
-support for ligatures.
+I like the IBM Plex font. JebBrains Mono has support for ligatures (it
+was set as the default font in =early-init.el=)
 
 #+begin_src emacs-lisp :tangle "init.el"
-  (set-face-font 'default "JetBrains Mono-16")
   (set-face-font 'variable-pitch "IBM Plex Sans-16")
 
   (use-package ligature
@@ -155,12 +147,13 @@ support for ligatures.
     (global-ligature-mode t))
 #+end_src
 
-
-** Theme and Icons
+** Themes, Icons, and a Few Small Things for Dired and iBuffer
 The theme of the moment is: Dracula.
 
 #+begin_src emacs-lisp :tangle "init.el"
-  (load-theme 'dracula t nil)
+      (use-package dracula-theme
+	:config
+	(load-theme 'dracula t nil))
 #+end_src
 
 I want =all-the-icons=:
@@ -173,20 +166,30 @@ I want =all-the-icons=:
 I want icons in =dired=. I also want =dired= to hide details by default:
 
 #+begin_src emacs-lisp :tangle "init.el"
-  (add-hook 'dired-mode-hook 'all-the-icons-dired-mode)
+  (use-package all-the-icons-dired
+    :hook (dired-mode . all-the-icons-dired-mode))
   (add-hook 'dired-mode-hook 'dired-hide-details-mode)
+#+end_src
+
+iBuffer? Yes please. iBuffer with icons? Very yes.
+
+#+begin_src emacs-lisp :tangle "init.el"
+  (global-set-key (kbd "C-x C-b") 'ibuffer)
+  (use-package all-the-icons-ibuffer
+    :hook (ibuffer-mode . all-the-icons-ibuffer-mode))
 #+end_src
 
 Finally, I want the icons in my completions:
 
 #+begin_src emacs-lisp :tangle "init.el"
-(all-the-icons-completion-mode)
+  (use-package all-the-icons-completion
+    :init (all-the-icons-completion-mode))
 #+end_src
-
 
 ** Modeline
 
-Custom, minimal modeline. Icons for edit status and major mode plus strings with buffer name and position as a percentage.
+Custom, minimal modeline. Icons for edit status and major mode plus
+strings with buffer name and position as a percentage.
 
 #+begin_src emacs-lisp :tangle "init.el"
 	  ;; taken from https://emacs.stackexchange.com/questions/5529/how-to-right-align-some-items-in-the-modeline
@@ -228,15 +231,14 @@ Custom, minimal modeline. Icons for edit status and major mode plus strings with
 						(format " %s " (leanmc-modeline-icon-major-mode))))))))
 #+end_src
 
-* Org Configuration
-I like this option, which makes formatting markers (*, _, =, etc)
-disappear after they're closed and shows the styled text instead.
-
+** Org Configuration
+I like hiding formatting markers (*, _, =, etc) and showing styled
+text instead. I also like starting up folded.
 #+begin_src emacs-lisp :tangle "init.el"
-(setq org-hide-emphasis-markers t)
+  (setq org-hide-emphasis-markers t)
+  (setq org-startup-folded t)
 #+end_src
-
-* Magit Configuration
+** Magit Configuration
 Avoid confusion about where the Github token is stored.
 
 #+begin_src emacs-lisp :tangle "init.el"

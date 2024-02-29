@@ -28,14 +28,13 @@
 
 (fido-vertical-mode 1)
 
-(recentf-mode 1)
 (use-package recentf
-    :bind ("C-x C-r" . recentf-open))
+    :bind ("C-x C-r" . recentf-open)
+    :ensure nil)
 (save-place-mode 1)
 
 (electric-pair-mode 1)
 
-(set-face-font 'default "JetBrains Mono-16")
 (set-face-font 'variable-pitch "IBM Plex Sans-16")
 
 (use-package ligature
@@ -54,15 +53,23 @@
 
   (global-ligature-mode t))
 
-(load-theme 'dracula t nil)
+(use-package dracula-theme
+  :config
+  (load-theme 'dracula t nil))
 
 (use-package all-the-icons
   :if (display-graphic-p))
 
-(add-hook 'dired-mode-hook 'all-the-icons-dired-mode)
+(use-package all-the-icons-dired
+  :hook (dired-mode . all-the-icons-dired-mode))
 (add-hook 'dired-mode-hook 'dired-hide-details-mode)
 
-(all-the-icons-completion-mode)
+(global-set-key (kbd "C-x C-b") 'ibuffer)
+(use-package all-the-icons-ibuffer
+  :hook (ibuffer-mode . all-the-icons-ibuffer-mode))
+
+(use-package all-the-icons-completion
+  :init (all-the-icons-completion-mode))
 
 ;; taken from https://emacs.stackexchange.com/questions/5529/how-to-right-align-some-items-in-the-modeline
 ;; this allows for some items to be right-justified. will be obsolete in emacs30 with mode-line-format-right-align
@@ -103,6 +110,7 @@ aligned respectively."
 				      (format " %s " (leanmc-modeline-icon-major-mode))))))))
 
 (setq org-hide-emphasis-markers t)
+(setq org-startup-folded t)
 
 (setq auth-sources '("~/.authinfo"))
 (use-package forge

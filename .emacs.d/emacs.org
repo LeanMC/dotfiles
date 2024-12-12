@@ -1,19 +1,5 @@
 * early-init.el
-** Frame Size and Default Font
-Fill the left half of the screen and set the font to Iosevka
-
-#+begin_src emacs-lisp :tangle "early-init.el"
-  (dolist (var '((left . 0)
-		 (top . 0)
-		 (fullscreen . fullheight)
-		 (width . 0.5)
-		 (font . "Iosevka-16")))
-    (add-to-list 'default-frame-alist var)
-    (add-to-list 'initial-frame-alist var))
-#+end_src
-
 ** Package config
-
 Use =use-package= and have it automatically ensure
 packages are installed.
 
@@ -26,8 +12,21 @@ packages are installed.
   (setq use-package-always-ensure t)
 #+end_src
 
-
 * init.el
+** Frame Size and Default Font
+Fill the left half of the screen and set the font to Iosevka.
+
+#+begin_src emacs-lisp :tangle "init.el"
+
+  (dolist (var '((left . 0)
+		 (top . 0)
+		 (fullscreen . fullheight)
+		 (width . 0.5)
+		 (font . "Iosevka-16")
+		 (undecorated . t)))
+    (add-to-list 'default-frame-alist var)
+    (add-to-list 'initial-frame-alist var))
+#+end_src
 ** macOS Modifier Keys
 On Macs, the =ns-*-modifier= commands allow for an easy way to put the
 control key under your thumbs, with meta nearby.
@@ -39,7 +38,6 @@ control key under your thumbs, with meta nearby.
    ns-option-modifier 'meta
    ns-control-modifier 'super))
 #+end_src
-
 ** Flash Modeline for Bell
 Instead of beeping audibly or flashing the entire frame, flash the
 modeline when bell-worthy actions are attempted.
@@ -52,7 +50,6 @@ modeline when bell-worthy actions are attempted.
   (setq visible-bell nil
 	ring-bell-function 'flash-mode-line)
 #+end_src
-
 ** Remove the Help
 Remove the menu, scroll and tool bars.
 
@@ -62,7 +59,6 @@ Remove the menu, scroll and tool bars.
   (scroll-bar-mode -1)
   (tool-bar-mode -1)
 #+end_src
-
 ** Logical Lines, Track End of Line
 Have =C-n= and =C-p= move by logical lines, even if they are too long to
 fit the width of the window/frame. When using these commands at the
@@ -73,7 +69,6 @@ specific column.
   (setq line-move-visual nil
 	track-eol t)
 #+end_src
-
 ** Line Numbers
 Relative line numbers allow me to easily jump to any visible line with
 an argument to =next-line= or =previous-line=.
@@ -82,7 +77,6 @@ an argument to =next-line= or =previous-line=.
   (global-display-line-numbers-mode)
   (setq display-line-numbers-type 'relative)
 #+end_src
-
 ** Cursor Highlighting and Styling
 Bar cursor. To make it easier to find, I like to have it always blink
 and to highlight the line it's on.
@@ -92,7 +86,6 @@ and to highlight the line it's on.
   (setq-default blink-cursor-blinks 0)
   (global-hl-line-mode 1)
 #+end_src
-
 ** Completion
 So far, =fido-vertical-mode= without any alteration has provided me with
 all I need. I enjoy using =C-n= and =C-p= to navigate completion options,
@@ -103,6 +96,12 @@ annoyance.
   (fido-vertical-mode 1)
 #+end_src
 
+While editing, =company= has served me well.
+#+begin_src emacs-lisp :tangle "init.el"
+  (use-package company
+    :config
+    (global-company-mode))
+#+end_src
 ** Recent Files, Save Location
 =recentf= for easily opening recently edited files. Save my place in
 files.
@@ -113,7 +112,6 @@ files.
 	:ensure nil)
     (save-place-mode 1)
 #+end_src
-
 ** Electric Pair Mode
 I almost never want an unclosed bracket, curly brace, parenthesis,
 etc. Electric pair mode saves me the trouble of typing the closer.
@@ -121,24 +119,37 @@ etc. Electric pair mode saves me the trouble of typing the closer.
 #+begin_src emacs-lisp :tangle "init.el"
   (electric-pair-mode 1)
 #+end_src
-
 ** Font and Ligatures
-Iosevka Aile for variable pitch, ligatures in =prog-mode=
+Georgia for variable pitch
 
 #+begin_src emacs-lisp :tangle "init.el"
-  (set-face-font 'variable-pitch "Iosevka Aile-16")
+  (set-face-font 'variable-pitch "Georgia-16")
+#+end_src
 
+Ligatures in =prog-mode=
+#+begin_src emacs-lisp :tangle "init.el"
   (use-package ligature
-    :config
-    (ligature-set-ligatures 'prog-mode '("<---" "<--"  "<<-" "<-" "->" "-->" "--->" "<->" "<-->" "<--->" "<---->" "<!--"
+  :load-path "path-to-ligature-repo"
+  :config
+  ;; Enable all Iosevka ligatures in programming modes
+  (ligature-set-ligatures 'prog-mode '("<---" "<--"  "<<-" "<-" "->" "-->" "--->" "<->" "<-->" "<--->" "<---->" "<!--"
                                        "<==" "<===" "<=" "=>" "=>>" "==>" "===>" ">=" "<=>" "<==>" "<===>" "<====>" "<!---"
                                        "<~~" "<~" "~>" "~~>" "::" ":::" "==" "!=" "===" "!=="
                                        ":=" ":-" ":+" "<*" "<*>" "*>" "<|" "<|>" "|>" "+:" "-:" "=:" "<******>" "++" "+++"))
-
-    (global-ligature-mode t))
+  ;; Enables ligature checks globally in all buffers. You can also do it
+  ;; per mode with `ligature-mode'.
+  (global-ligature-mode t))
 #+end_src
 
-** Themes, Icons, and a Few Small Things for Dired and iBuffer
+Install =mixed-pitch= and use it in text modes
+
+#+begin_src emacs-lisp :tangle "init.el"
+(use-package mixed-pitch
+  :hook
+  ;; If you want it in all text modes:
+  (text-mode . mixed-pitch-mode))
+#+end_src
+** Themes and Icons Everywhere
 The theme of the moment is: Dracula.
 
 #+begin_src emacs-lisp :tangle "init.el"
@@ -176,7 +187,6 @@ Icons in my completions:
   (use-package all-the-icons-completion
     :init (all-the-icons-completion-mode))
 #+end_src
-
 ** Modeline
 
 Custom, minimal modeline. Icons for edit status and major mode plus
@@ -221,13 +231,11 @@ strings with buffer name and position as a percentage.
 						"%p%% "
 						(format " %s " (leanmc-modeline-icon-major-mode))))))))
 #+end_src
-
 ** Org Configuration
 Hide formatting markers (*, _, =, etc) and show styled text
-instead. Start up folded.
+instead. 
 #+begin_src emacs-lisp :tangle "init.el"
   (setq org-hide-emphasis-markers t)
-  (setq org-startup-folded t)
 #+end_src
 ** Magit Configuration
 Avoid confusion about where the Github token is stored.
@@ -236,4 +244,15 @@ Avoid confusion about where the Github token is stored.
   (setq auth-sources '("~/.authinfo"))
   (use-package forge
     :after magit)
+#+end_src
+** Ledger Configuration
+Enable =ledger-mode= and =flycheck-ledger=.
+
+#+begin_src emacs-lisp :tangle "init.el"
+  (use-package ledger-mode
+    :mode ("\\.dat\\'"
+           "\\.ledger\\'"))
+;;    :custom (ledger-clear-whole-transactions t))
+       
+  (use-package flycheck-ledger :after ledger-mode)
 #+end_src

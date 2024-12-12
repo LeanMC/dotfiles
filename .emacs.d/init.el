@@ -1,3 +1,12 @@
+(dolist (var '((left . 0)
+	       (top . 0)
+	       (fullscreen . fullheight)
+	       (width . 0.5)
+	       (font . "Iosevka-16")
+	       (undecorated . t)))
+  (add-to-list 'default-frame-alist var)
+  (add-to-list 'initial-frame-alist var))
+
 (when (eq system-type 'darwin)
   (setq
    ns-command-modifier 'control
@@ -28,6 +37,10 @@
 
 (fido-vertical-mode 1)
 
+(use-package company
+  :config
+  (global-company-mode))
+
 (use-package recentf
     :bind ("C-x C-r" . recentf-open)
     :ensure nil)
@@ -35,16 +48,24 @@
 
 (electric-pair-mode 1)
 
-(set-face-font 'variable-pitch "Iosevka Aile-16")
+(set-face-font 'variable-pitch "Georgia-16")
 
 (use-package ligature
-  :config
-  (ligature-set-ligatures 'prog-mode '("<---" "<--"  "<<-" "<-" "->" "-->" "--->" "<->" "<-->" "<--->" "<---->" "<!--"
+:load-path "path-to-ligature-repo"
+:config
+;; Enable all Iosevka ligatures in programming modes
+(ligature-set-ligatures 'prog-mode '("<---" "<--"  "<<-" "<-" "->" "-->" "--->" "<->" "<-->" "<--->" "<---->" "<!--"
                                      "<==" "<===" "<=" "=>" "=>>" "==>" "===>" ">=" "<=>" "<==>" "<===>" "<====>" "<!---"
                                      "<~~" "<~" "~>" "~~>" "::" ":::" "==" "!=" "===" "!=="
                                      ":=" ":-" ":+" "<*" "<*>" "*>" "<|" "<|>" "|>" "+:" "-:" "=:" "<******>" "++" "+++"))
+;; Enables ligature checks globally in all buffers. You can also do it
+;; per mode with `ligature-mode'.
+(global-ligature-mode t))
 
-  (global-ligature-mode t))
+(use-package mixed-pitch
+  :hook
+  ;; If you want it in all text modes:
+  (text-mode . mixed-pitch-mode))
 
 (use-package dracula-theme
   :config
@@ -103,8 +124,27 @@ aligned respectively."
 				      (format " %s " (leanmc-modeline-icon-major-mode))))))))
 
 (setq org-hide-emphasis-markers t)
-(setq org-startup-folded t)
 
 (setq auth-sources '("~/.authinfo"))
 (use-package forge
   :after magit)
+
+(use-package ledger-mode
+    :mode ("\\.dat\\'"
+           "\\.ledger\\'"))
+;;    :custom (ledger-clear-whole-transactions t))
+       
+  (use-package flycheck-ledger :after ledger-mode)
+(custom-set-variables
+ ;; custom-set-variables was added by Custom.
+ ;; If you edit it by hand, you could mess it up, so be careful.
+ ;; Your init file should contain only one such instance.
+ ;; If there is more than one, they won't work right.
+ '(package-selected-packages
+   '(mixed-pitch zenburn-theme solarized-theme ligature ledger-mode gruvbox-theme forge flycheck-ledger emmet-mode dracula-theme company all-the-icons-ibuffer all-the-icons-dired all-the-icons-completion)))
+(custom-set-faces
+ ;; custom-set-faces was added by Custom.
+ ;; If you edit it by hand, you could mess it up, so be careful.
+ ;; Your init file should contain only one such instance.
+ ;; If there is more than one, they won't work right.
+ )

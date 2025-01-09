@@ -1,6 +1,7 @@
 (require 'package)
+(require 'use-package-ensure)
 (add-to-list 'package-archives '("melpa" . "https://melpa.org/packages/") t)
 (package-initialize)
-(setq package-enable-at-startup t)
-
-(setq use-package-always-ensure t)
+(setopt use-package-always-ensure t)
+(unless package-archive-contents
+  (package-refresh-contents))

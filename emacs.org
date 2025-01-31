@@ -1,6 +1,9 @@
 * early-init.el
+:PROPERTIES:
+:header-args: :tangle "~/.emacs.d/early-init.el"
+:END:
 ** Package management
-#+begin_src emacs-lisp :tangle "~/.emacs.d/early-init.el"
+#+begin_src emacs-lisp
   (require 'package)
   (require 'use-package-ensure)
   (add-to-list 'package-archives '("melpa" . "https://melpa.org/packages/") t)
@@ -10,18 +13,37 @@
     (package-refresh-contents))
 #+end_src
 * init.el
+:PROPERTIES:
+:header-args: :tangle "~/.emacs.d/init.el"
+:END:
 ** Frame options
-#+begin_src emacs-lisp :tangle "~/.emacs.d/init.el"
-  (defvar leanmc-default-font "Victor Mono-20")
-  (defvar leanmc-variable-pitch-font "CMU Serif-22")
+#+begin_src emacs-lisp
+  (setq leanmc-default-font "Iosevka-20")
+  (setq leanmc-variable-pitch-font "CMU Serif-22")
   (dolist (x
 	   `((fullscreen . fullboth)
-	     (font . ,leanmc-default-font)))
+	     (font . ,leanmc-default-font)
+	     (cursor-color . "red")))
     (add-to-list 'default-frame-alist x)
     (add-to-list 'initial-frame-alist x))
 #+end_src
+These lists track faces that should use a monospaced font, for use in [[*Cursor options]] and in [[*Org options]].
+#+begin_src emacs-lisp
+  (setq fixed-general-faces
+	'(org-block
+	  org-code
+	  org-table
+	  org-property-value
+	  line-number))
+  (setq fixed-shadow-faces
+	'(org-block-begin-line
+	  org-block-end-line
+	  org-drawer
+	  org-meta-line))
+  (setq fixed-faces (append fixed-general-faces fixed-shadow-faces))
+#+end_src
 ** Ergonomics on macOS
-#+begin_src emacs-lisp :tangle "~/.emacs.d/init.el"
+#+begin_src emacs-lisp
   (when (eq system-type 'darwin)
     (setopt
      ns-command-modifier 'control
@@ -30,7 +52,7 @@
 #+end_src
 ** Flash modeline for system bell
 Instead of beeping audibly or flashing the entire frame, flash the modeline.
-#+begin_src emacs-lisp :tangle "~/.emacs.d/init.el"
+#+begin_src emacs-lisp
   (defun flash-mode-line()
     (invert-face 'mode-line)
     (run-with-timer 0.1 nil #'invert-face 'mode-line))
@@ -39,24 +61,45 @@ Instead of beeping audibly or flashing the entire frame, flash the modeline.
 	  ring-bell-function 'flash-mode-line)
 #+end_src
 ** Hide the help
-#+begin_src emacs-lisp :tangle "~/.emacs.d/init.el"
+#+begin_src emacs-lisp
   (setopt inhibit-startup-screen t)
   (menu-bar-mode -1)
   (scroll-bar-mode -1)
   (tool-bar-mode -1)
 #+end_src
 ** Line numbers
-#+begin_src emacs-lisp :tangle "~/.emacs.d/init.el"
+#+begin_src emacs-lisp
   (global-display-line-numbers-mode)
-  (setopt display-line-numbers-type 'relative)
+  (setopt display-line-numbers-type 'visual)
 #+end_src
 ** Cursor options
-#+begin_src emacs-lisp :tangle "~/.emacs.d/init.el"
-  (setopt blink-cursor-mode nil)
+Never blink. Highlight the current line.
+#+begin_src emacs-lisp
+  (blink-cursor-mode 0)
   (global-hl-line-mode 1)
 #+end_src
+Function run after each command (via a hook added in [[*Org options]]) to set cursor to box for fixed pitch faces and bar for variable.
+#+begin_src emacs-lisp
+  (defun leanmc-sync-cursor-type-with-pitch ()
+    "Set cursor-type to box in fixed-pitch and bar in variable-pitch"
+    (let ((point-faces (get-text-property (point) 'face)))
+      (if (listp point-faces)
+	  (if (leanmc-list-intersect-p point-faces fixed-faces)
+	      (setq cursor-type 'box)
+	    (setq cursor-type 'bar))
+	(if (member point-faces fixed-faces)
+	    (setq cursor-type 'box)
+	  (setq cursor-type 'bar)))))
+
+  (defun leanmc-list-intersect-p (list1 list2)
+    "Return non-nil if any elements of LIST1 appear in LIST2.
+  Comparison is done with `equal'."
+    (while (and list1 (not (member (car list1) list2)))
+      (pop list1))
+    list1)
+#+end_src
 ** Completion options
-#+begin_src emacs-lisp :tangle "~/.emacs.d/init.el"
+#+begin_src emacs-lisp
   (setopt completion-auto-wrap t
 	  completion-auto-help 'always
 	  completions-max-height 15
@@ -66,27 +109,43 @@ Instead of beeping audibly or flashing the entire frame, flash the modeline.
   (fido-vertical-mode 1)
 #+end_src
 ** Close parens, quotes, etc.
-#+begin_src emacs-lisp :tangle "~/.emacs.d/init.el"
+#+begin_src emacs-lisp
   (electric-pair-mode 1)
 #+end_src
 ** Appearance
-Nice variable and fixed pitch fonts
-#+begin_src emacs-lisp :tangle "~/.emacs.d/init.el"
+Options for fixed and variable pitch fonts. Uses variables set in [[*Frame options]].
+#+begin_src emacs-lisp
   (set-face-font 'fixed-pitch leanmc-default-font)
   (set-face-font 'variable-pitch leanmc-variable-pitch-font)
+  (add-hook 'text-mode-hook 'variable-pitch-mode)
+  (add-hook 'text-mode-hook 'visual-line-mode)
+  (add-hook 'buffer-face-mode-hook
+	    (lambda ()
+	      (if buffer-face-mode
+		  (setq cursor-type 'bar)
+		(setq cursor-type 'box))))
 #+end_src
-=variable-pitch-mode= for text modes
-#+begin_src emacs-lisp :tangle "~/.emacs.d/init.el"
-  (add-hook 'text-mode-hook #'variable-pitch-mode)
+Theme and its options.
+#+begin_src emacs-lisp
+  (setopt modus-themes-italic-constructs t
+	  modus-themes-bold-constructs t
+	  modus-themes-mode-line '(borderless accented 3d)
+	  modus-themes-region '(accented)
+	  modus-themes-paren-match '(bold intense)
+	  modus-themes-prompts '(bold intense)
+	  modus-themes-org-blocks 'gray-background
+	  modus-themes-fringes nil
+	  modus-themes-headings
+	  '((t . (rainbow overline background))
+	    (5 . (rainbow overline background 1.1))
+	    (4 . (rainbow overline background 1.2))
+	    (3 . (rainbow overline background 1.3))
+	    (2 . (rainbow overline background 1.4))
+	    (1 . (rainbow overline background 1.5))))
+  (load-theme 'modus-vivendi)
 #+end_src
-A nice theme
-#+begin_src emacs-lisp :tangle "~/.emacs.d/init.el"
-  (use-package dracula-theme
-    :config
-    (load-theme 'dracula t nil))
-#+end_src
-Icons, and some sprucing up of the buffer list and =dired=
-#+begin_src emacs-lisp :tangle "~/.emacs.d/init.el"
+Icons everywhere.
+#+begin_src emacs-lisp
   (use-package all-the-icons
     :if (display-graphic-p))
 
@@ -98,13 +157,15 @@ Icons, and some sprucing up of the buffer list and =dired=
 
   (global-set-key (kbd "C-x C-b") 'ibuffer)
   (use-package all-the-icons-ibuffer
+    :after all-the-icons
     :hook (ibuffer-mode . all-the-icons-ibuffer-mode))
 
   (use-package all-the-icons-completion
+    :after all-the-icons
     :config (all-the-icons-completion-mode))
 #+end_src
-A nice, uncluttered modeline.
-#+begin_src emacs-lisp :tangle "~/.emacs.d/init.el"
+Custom mode line.
+#+begin_src emacs-lisp
   (setopt display-time-default-load-average nil)
   (setopt display-time-day-and-date t)
   (setopt display-time-format "%a %m/%d at %I:%M%p")
@@ -131,28 +192,62 @@ A nice, uncluttered modeline.
   (setq-default mode-line-format '(:eval (leanmc-modeline)))
 #+end_src
 ** Org options
-#+begin_src emacs-lisp :tangle "~/.emacs.d/init.el"
-    (setopt org-hide-emphasis-markers t
-	    org-startup-folded t)
-    (defun leanmc-org-mode-hook ()
-      (variable-pitch-mode 1)
-      (visual-line-mode 1)
-      (dolist (f (list 'org-block 'org-code 'org-table 'line-number))
-	(set-face-attribute f nil :inherit 'fixed-pitch))
-      (dolist (f (list 'org-block-begin-line 'org-block-end-line 'org-meta-line))
-	(set-face-attribute f nil :inherit '(shadow fixed-pitch)))
-      (set-face-attribute 'org-verbatim nil :inherit '(org-quote fixed-pitch)))
-    (add-hook 'org-mode-hook 'leanmc-org-mode-hook)
+#+begin_src emacs-lisp
+  (setopt org-hide-emphasis-markers t
+	  org-startup-folded t
+	  org-cycle-emulate-tab 'whitestart)
+#+end_src
+When org starts, set monospaced faces (using lists set in [[*Frame options]]) and run the function defined in [[*Cursor options]] after each command to change the cursor type.
+#+begin_src emacs-lisp
+  (defun leanmc-org-mode-hook ()
+    (dolist (face fixed-general-faces)
+      (set-face-attribute face nil :inherit 'fixed-pitch))
+    (dolist (face fixed-shadow-faces)
+      (set-face-attribute face nil :inherit '(shadow fixed-pitch)))
+    (set-face-attribute 'org-verbatim nil :inherit '(org-quote fixed-pitch))
+    (add-hook 'post-command-hook 'leanmc-sync-cursor-type-with-pitch 0 t))
+
+  (add-hook 'org-mode-hook 'leanmc-org-mode-hook)
 #+end_src
 ** Ledger options
-#+begin_src emacs-lisp :tangle "~/.emacs.d/init.el"
+#+begin_src emacs-lisp
   (use-package ledger-mode
     :mode ("\\.dat\\'"
 	   "\\.ledger\\'")
     :config (when (eq system-type 'windows-nt) (setq ledger-binary-path "~/ledger.exe")))
 #+end_src
 ** Magit
-#+begin_src emacs-lisp :tangle "~/.emacs.d/init.el"
+#+begin_src emacs-lisp
   (setq auth-sources '("~/.authinfo"))
   (use-package magit)
+#+end_src
+** ERC
+#+begin_src emacs-lisp
+  (setopt erc-modules
+	  '(autojoin
+	    button
+	    completion
+	    fill
+	    irccontrols
+	    list
+	    match
+	    menu
+	    move-to-prompt
+	    netsplit
+	    networks
+	    noncommands
+	    notifications
+	    readonly
+	    ring
+	    sasl
+	    spelling
+	    stamp
+	    track)
+	  erc-autojoin-channels-alist
+	  '(("libera.chat" "#emacs"))
+	  erc-autojoin-timing 'ident
+	  erc-hide-list
+	  '("JOIN" "PART" "QUIT")
+	  erc-track-exclude-types '("JOIN" "MODE" "NICK" "PART" "QUIT"
+				    "324" "329" "332" "333" "353" "477"))
 #+end_src

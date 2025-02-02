@@ -17,17 +17,19 @@
 :header-args: :tangle "~/.emacs.d/init.el"
 :END:
 ** Frame options
+:PROPERTIES:
+:ID:       f96ed644-792c-40ea-85f5-92f04b4e3ff6
+:END:
 #+begin_src emacs-lisp
   (setq leanmc-default-font "Iosevka-20")
   (setq leanmc-variable-pitch-font "CMU Serif-22")
   (dolist (x
 	   `((fullscreen . fullboth)
-	     (font . ,leanmc-default-font)
-	     (cursor-color . "red")))
+	     (font . ,leanmc-default-font)))
     (add-to-list 'default-frame-alist x)
     (add-to-list 'initial-frame-alist x))
 #+end_src
-These lists track faces that should use a monospaced font, for use in [[*Cursor options]] and in [[*Org options]].
+These lists track faces that should use a monospaced font, for use in [[id:29773854-7007-4d58-9734-44942486fa55][Cursor options]] and in [[id:6b3719c9-87d2-4b92-8998-3a9bc163a2a9][Org options]].
 #+begin_src emacs-lisp
   (setq fixed-general-faces
 	'(org-block
@@ -39,6 +41,7 @@ These lists track faces that should use a monospaced font, for use in [[*Cursor 
 	'(org-block-begin-line
 	  org-block-end-line
 	  org-drawer
+	  org-special-keyword
 	  org-meta-line))
   (setq fixed-faces (append fixed-general-faces fixed-shadow-faces))
 #+end_src
@@ -73,12 +76,16 @@ Instead of beeping audibly or flashing the entire frame, flash the modeline.
   (setopt display-line-numbers-type 'visual)
 #+end_src
 ** Cursor options
-Never blink. Highlight the current line.
+:PROPERTIES:
+:ID:       29773854-7007-4d58-9734-44942486fa55
+:END:
+Red color. Never blink. Highlight the current line.
 #+begin_src emacs-lisp
+  (set-face-attribute 'cursor nil :background "red")
   (blink-cursor-mode 0)
   (global-hl-line-mode 1)
 #+end_src
-Function run after each command (via a hook added in [[*Org options]]) to set cursor to box for fixed pitch faces and bar for variable.
+Function run after each command (via a hook added in [[id:6b3719c9-87d2-4b92-8998-3a9bc163a2a9][Org options]]) to set cursor to box for fixed pitch faces and bar for variable.
 #+begin_src emacs-lisp
   (defun leanmc-sync-cursor-type-with-pitch ()
     "Set cursor-type to box in fixed-pitch and bar in variable-pitch"
@@ -113,7 +120,7 @@ Function run after each command (via a hook added in [[*Org options]]) to set cu
   (electric-pair-mode 1)
 #+end_src
 ** Appearance
-Options for fixed and variable pitch fonts. Uses variables set in [[*Frame options]].
+Options for fixed and variable pitch fonts. Uses variables set in [[id:f96ed644-792c-40ea-85f5-92f04b4e3ff6][Frame options]].
 #+begin_src emacs-lisp
   (set-face-font 'fixed-pitch leanmc-default-font)
   (set-face-font 'variable-pitch leanmc-variable-pitch-font)
@@ -192,12 +199,19 @@ Custom mode line.
   (setq-default mode-line-format '(:eval (leanmc-modeline)))
 #+end_src
 ** Org options
+:PROPERTIES:
+:ID:       6b3719c9-87d2-4b92-8998-3a9bc163a2a9
+:END:
 #+begin_src emacs-lisp
   (setopt org-hide-emphasis-markers t
 	  org-startup-folded t
+	  org-hide-block-startup t
+	  org-id-link-to-org-use-id t
+	  org-return-follows-link t
+	  org-tab-follows-link t
 	  org-cycle-emulate-tab 'whitestart)
 #+end_src
-When org starts, set monospaced faces (using lists set in [[*Frame options]]) and run the function defined in [[*Cursor options]] after each command to change the cursor type.
+When org starts, set monospaced faces (using lists set in [[*Frame options][Frame options]]) and run the function defined [[id:29773854-7007-4d58-9734-44942486fa55][Cursor options]] after each command to change the cursor type.
 #+begin_src emacs-lisp
   (defun leanmc-org-mode-hook ()
     (dolist (face fixed-general-faces)

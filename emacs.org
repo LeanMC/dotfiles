@@ -24,25 +24,30 @@
   (setq leanmc-default-font "Iosevka-20")
   (setq leanmc-variable-pitch-font "CMU Serif-22")
   (dolist (x
-	   `((fullscreen . fullboth)
-	     (font . ,leanmc-default-font)))
+  	 `((fullscreen . fullboth)
+  	   (font . ,leanmc-default-font)))
     (add-to-list 'default-frame-alist x)
     (add-to-list 'initial-frame-alist x))
 #+end_src
 These lists track faces that should use a monospaced font, for use in [[id:29773854-7007-4d58-9734-44942486fa55][Cursor options]] and in [[id:6b3719c9-87d2-4b92-8998-3a9bc163a2a9][Org options]].
 #+begin_src emacs-lisp
   (setq fixed-general-faces
-	'(org-block
-	  org-code
-	  org-table
-	  org-property-value
-	  line-number))
+        '(line-number
+  	org-checkbox
+  	org-code
+  	org-document-info
+  	org-document-title
+  	org-date
+  	org-property-value
+  	org-table
+  	org-block))
   (setq fixed-shadow-faces
-	'(org-block-begin-line
-	  org-block-end-line
-	  org-drawer
-	  org-special-keyword
-	  org-meta-line))
+        '(org-block-end-line
+  	org-document-info-keyword
+  	org-drawer
+  	org-meta-line
+  	org-special-keyword
+  	org-block-begin-line))
   (setq fixed-faces (append fixed-general-faces fixed-shadow-faces))
 #+end_src
 ** Ergonomics on macOS
@@ -61,7 +66,7 @@ Instead of beeping audibly or flashing the entire frame, flash the modeline.
     (run-with-timer 0.1 nil #'invert-face 'mode-line))
 
   (setopt visible-bell nil
-	  ring-bell-function 'flash-mode-line)
+  	ring-bell-function 'flash-mode-line)
 #+end_src
 ** Hide the help
 #+begin_src emacs-lisp
@@ -73,7 +78,8 @@ Instead of beeping audibly or flashing the entire frame, flash the modeline.
 ** Line numbers
 #+begin_src emacs-lisp
   (global-display-line-numbers-mode)
-  (setopt display-line-numbers-type 'visual)
+  (setopt display-line-numbers-type 'visual
+  	display-line-numbers-width-start t)
 #+end_src
 ** Cursor options
 :PROPERTIES:
@@ -91,12 +97,12 @@ Function run after each command (via a hook added in [[id:6b3719c9-87d2-4b92-899
     "Set cursor-type to box in fixed-pitch and bar in variable-pitch"
     (let ((point-faces (get-text-property (point) 'face)))
       (if (listp point-faces)
-	  (if (leanmc-list-intersect-p point-faces fixed-faces)
-	      (setq cursor-type 'box)
-	    (setq cursor-type 'bar))
-	(if (member point-faces fixed-faces)
-	    (setq cursor-type 'box)
-	  (setq cursor-type 'bar)))))
+  	(if (leanmc-list-intersect-p point-faces fixed-faces)
+  	    (setq cursor-type 'box)
+  	  (setq cursor-type 'bar))
+        (if (member point-faces fixed-faces)
+  	  (setq cursor-type 'box)
+  	(setq cursor-type 'bar)))))
 
   (defun leanmc-list-intersect-p (list1 list2)
     "Return non-nil if any elements of LIST1 appear in LIST2.
@@ -108,12 +114,16 @@ Function run after each command (via a hook added in [[id:6b3719c9-87d2-4b92-899
 ** Completion options
 #+begin_src emacs-lisp
   (setopt completion-auto-wrap t
-	  completion-auto-help 'always
-	  completions-max-height 15
-	  completions-format 'one-column
-	  completion-auto-select 'second-tab
-	  completions-detailed t)
+    	completion-auto-help 'visible
+    	completions-max-height 15
+    	completions-format 'vertical
+    	completion-auto-select 'second-tab
+    	completions-detailed t)
   (fido-vertical-mode 1)
+  (global-completion-preview-mode 1)
+  (define-key completion-preview-active-mode-map (kbd "M-n") 'completion-preview-next-candidate)
+  (define-key completion-preview-active-mode-map (kbd "M-p") 'completion-preview-prev-candidate)
+  (define-key completion-preview-active-mode-map (kbd "RET") 'completion-preview-insert)
 #+end_src
 ** Close parens, quotes, etc.
 #+begin_src emacs-lisp
@@ -127,29 +137,23 @@ Options for fixed and variable pitch fonts. Uses variables set in [[id:f96ed644-
   (add-hook 'text-mode-hook 'variable-pitch-mode)
   (add-hook 'text-mode-hook 'visual-line-mode)
   (add-hook 'buffer-face-mode-hook
-	    (lambda ()
-	      (if buffer-face-mode
-		  (setq cursor-type 'bar)
-		(setq cursor-type 'box))))
+  	  (lambda ()
+  	    (if buffer-face-mode
+  		(setq cursor-type 'bar)
+  	      (setq cursor-type 'box))))
 #+end_src
 Theme and its options.
 #+begin_src emacs-lisp
   (setopt modus-themes-italic-constructs t
-	  modus-themes-bold-constructs t
-	  modus-themes-mode-line '(borderless accented 3d)
-	  modus-themes-region '(accented)
-	  modus-themes-paren-match '(bold intense)
-	  modus-themes-prompts '(bold intense)
-	  modus-themes-org-blocks 'gray-background
-	  modus-themes-fringes nil
-	  modus-themes-headings
-	  '((t . (rainbow overline background))
-	    (5 . (rainbow overline background 1.1))
-	    (4 . (rainbow overline background 1.2))
-	    (3 . (rainbow overline background 1.3))
-	    (2 . (rainbow overline background 1.4))
-	    (1 . (rainbow overline background 1.5))))
-  (load-theme 'modus-vivendi)
+  	modus-themes-bold-constructs t
+  	modus-themes-prompts '(bold)
+  	modus-themes-headings
+  	'((5 . (1.1))
+  	  (4 . (1.2))
+  	  (3 . (1.3))
+  	  (2 . (1.4))
+  	  (1 . (1.5))))
+  (load-theme 'modus-vivendi-tinted)
 #+end_src
 Icons everywhere.
 #+begin_src emacs-lisp
@@ -173,30 +177,34 @@ Icons everywhere.
 #+end_src
 Custom mode line.
 #+begin_src emacs-lisp
-  (setopt display-time-default-load-average nil)
-  (setopt display-time-day-and-date t)
-  (setopt display-time-format "%a %m/%d at %I:%M%p")
+  (setopt display-time-default-load-average nil
+  	display-time-day-and-date t
+  	display-time-format "%a %m/%d at %I:%M%p")
   (display-time)
-  (defun leanmc-modeline ()
-    (let*
-	((modified-icon (let* ((config-alist
-				'(("*" all-the-icons-faicon-family
-				   all-the-icons-faicon "chain-broken" :height 1.2 :v-adjust -0.0)
-				  ("-" all-the-icons-faicon-family
-				   all-the-icons-faicon "link" :height 1.2 :v-adjust -0.0)
-				  ("%" all-the-icons-octicon-family
-				   all-the-icons-octicon "lock" :height 1.2 :v-adjust 0.1)))
-			       (result (cdr (assoc (format-mode-line "%*") config-alist))))
-			  (propertize (apply (cadr result) (cddr result))
-				      'face `(:family ,(funcall (car result))))))
-	 (left (format-mode-line `(" ",modified-icon" ",mode-line-buffer-identification)))
-	 (mode-icon (propertize (all-the-icons-icon-for-mode major-mode)
-				'help-echo (format "Major-mode: %s" major-mode)
-				'local-map mode-line-major-mode-keymap))
-	 (right (format-mode-line `(,mode-icon" ",mode-line-misc-info)))
-	 (available-width (- (window-width) (length left) 4)))
-      (format (format " %%s %%%ds " available-width) left right)))
-  (setq-default mode-line-format '(:eval (leanmc-modeline)))
+  (let*
+      ((modified-icon '(:eval
+  		      (let* ((config-alist
+                                '(("*" all-the-icons-faicon-family
+  				 all-the-icons-faicon "chain-broken" :height 1.2 :v-adjust -0.0)
+  				("-" all-the-icons-faicon-family
+  				 all-the-icons-faicon "link" :height 1.2 :v-adjust -0.0)
+  				("%" all-the-icons-octicon-family
+  				 all-the-icons-octicon "lock" :height 1.2 :v-adjust 0.1)))
+  			     (result (cdr (assoc (format-mode-line "%*") config-alist))))
+  			(propertize (apply (cadr result) (cddr result))
+  				    'face `(:family ,(funcall (car result)))))))
+       (mode-icon '(:eval (propertize (all-the-icons-icon-for-mode major-mode)
+  				    'help-echo (format "Major-mode: %s" major-mode)
+  				    'local-map mode-line-major-mode-keymap))))
+    (setq-default mode-line-format `(" "
+  				   ,modified-icon
+  				   " "
+  				   ,mode-line-buffer-identification
+  				   mode-line-format-right-align
+  				   ,mode-icon
+  				   " "
+  				   ,mode-line-misc-info
+  				   " ")))
 #+end_src
 ** Org options
 :PROPERTIES:
@@ -204,14 +212,15 @@ Custom mode line.
 :END:
 #+begin_src emacs-lisp
   (setopt org-hide-emphasis-markers t
-	  org-startup-folded t
-	  org-hide-block-startup t
-	  org-id-link-to-org-use-id t
-	  org-return-follows-link t
-	  org-tab-follows-link t
-	  org-cycle-emulate-tab 'whitestart)
+  	org-startup-folded 'fold
+  	org-hide-block-startup t
+  	org-id-link-to-org-use-id t
+  	org-return-follows-link t
+  	org-tab-follows-link t
+  	org-cycle-emulate-tab 'whitestart
+  	org-agenda-files '("~/Dropbox/org/life.org"))
 #+end_src
-When org starts, set monospaced faces (using lists set in [[*Frame options][Frame options]]) and run the function defined [[id:29773854-7007-4d58-9734-44942486fa55][Cursor options]] after each command to change the cursor type.
+When org starts, set monospaced faces (using lists set in [[*Frame options][Frame options]]) and run the function defined in [[id:29773854-7007-4d58-9734-44942486fa55][Cursor options]] after each command to change the cursor type.
 #+begin_src emacs-lisp
   (defun leanmc-org-mode-hook ()
     (dolist (face fixed-general-faces)
@@ -219,7 +228,17 @@ When org starts, set monospaced faces (using lists set in [[*Frame options][Fram
     (dolist (face fixed-shadow-faces)
       (set-face-attribute face nil :inherit '(shadow fixed-pitch)))
     (set-face-attribute 'org-verbatim nil :inherit '(org-quote fixed-pitch))
-    (add-hook 'post-command-hook 'leanmc-sync-cursor-type-with-pitch 0 t))
+    (add-hook 'post-command-hook 'leanmc-sync-cursor-type-with-pitch 0 t)
+    (define-key org-mode-map (kbd "C-c C-a") #'org-agenda)
+    (setq-local completion-preview-commands
+                '(;; self-insert-command
+                  org-self-insert-command
+                  insert-char
+                  ;; delete-backward-char
+                  org-delete-backward-char
+                  backward-delete-char-untabify
+                  analyze-text-conversion
+                  completion-preview-complete)))
 
   (add-hook 'org-mode-hook 'leanmc-org-mode-hook)
 #+end_src
@@ -227,7 +246,7 @@ When org starts, set monospaced faces (using lists set in [[*Frame options][Fram
 #+begin_src emacs-lisp
   (use-package ledger-mode
     :mode ("\\.dat\\'"
-	   "\\.ledger\\'")
+  	 "\\.ledger\\'")
     :config (when (eq system-type 'windows-nt) (setq ledger-binary-path "~/ledger.exe")))
 #+end_src
 ** Magit
@@ -238,30 +257,30 @@ When org starts, set monospaced faces (using lists set in [[*Frame options][Fram
 ** ERC
 #+begin_src emacs-lisp
   (setopt erc-modules
-	  '(autojoin
-	    button
-	    completion
-	    fill
-	    irccontrols
-	    list
-	    match
-	    menu
-	    move-to-prompt
-	    netsplit
-	    networks
-	    noncommands
-	    notifications
-	    readonly
-	    ring
-	    sasl
-	    spelling
-	    stamp
-	    track)
-	  erc-autojoin-channels-alist
-	  '(("libera.chat" "#emacs"))
-	  erc-autojoin-timing 'ident
-	  erc-hide-list
-	  '("JOIN" "PART" "QUIT")
-	  erc-track-exclude-types '("JOIN" "MODE" "NICK" "PART" "QUIT"
-				    "324" "329" "332" "333" "353" "477"))
+  	'(autojoin
+  	  button
+  	  completion
+  	  fill
+  	  irccontrols
+  	  list
+  	  match
+  	  menu
+  	  move-to-prompt
+  	  netsplit
+  	  networks
+  	  noncommands
+  	  notifications
+  	  readonly
+  	  ring
+  	  sasl
+  	  spelling
+  	  stamp
+  	  track)
+  	erc-autojoin-channels-alist
+  	'(("libera.chat" "#emacs"))
+  	erc-autojoin-timing 'ident
+  	erc-hide-list
+  	'("JOIN" "PART" "QUIT")
+  	erc-track-exclude-types '("JOIN" "MODE" "NICK" "PART" "QUIT"
+  				  "324" "329" "332" "333" "353" "477"))
 #+end_src

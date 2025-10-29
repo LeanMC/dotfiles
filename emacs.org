@@ -21,13 +21,19 @@
 :ID:       f96ed644-792c-40ea-85f5-92f04b4e3ff6
 :END:
 #+begin_src emacs-lisp
-  (setq leanmc-default-font "Iosevka-20")
-  (setq leanmc-variable-pitch-font "CMU Serif-22")
+  (setq leanmc-default-font "IBM Plex Mono-20")
+  (setq leanmc-variable-pitch-font "IBM Plex Serif-22")
   (dolist (x
   	 `((fullscreen . fullboth)
   	   (font . ,leanmc-default-font)))
     (add-to-list 'default-frame-alist x)
     (add-to-list 'initial-frame-alist x))
+  (use-package solarized-theme)
+  (use-package zenburn-theme)
+  (use-package color-theme-sanityinc-tomorrow)
+  (use-package dracula-theme)
+  (use-package gruvbox-theme)
+  (use-package doom-themes)
 #+end_src
 These lists track faces that should use a monospaced font, for use in [[id:29773854-7007-4d58-9734-44942486fa55][Cursor options]] and in [[id:6b3719c9-87d2-4b92-8998-3a9bc163a2a9][Org options]].
 #+begin_src emacs-lisp
@@ -40,6 +46,7 @@ These lists track faces that should use a monospaced font, for use in [[id:29773
   	org-date
   	org-property-value
   	org-table
+  	org-formula
   	org-block))
   (setq fixed-shadow-faces
         '(org-block-end-line
@@ -71,7 +78,7 @@ Instead of beeping audibly or flashing the entire frame, flash the modeline.
 ** Hide the help
 #+begin_src emacs-lisp
   (setopt inhibit-startup-screen t)
-  (menu-bar-mode -1)
+  (if (not (eq system-type 'darwin)) (menu-bar-mode -1))
   (scroll-bar-mode -1)
   (tool-bar-mode -1)
 #+end_src
@@ -88,7 +95,7 @@ Instead of beeping audibly or flashing the entire frame, flash the modeline.
 Red color. Never blink. Highlight the current line.
 #+begin_src emacs-lisp
   (set-face-attribute 'cursor nil :background "red")
-  (blink-cursor-mode 0)
+  (setq blink-cursor-blinks 0)
   (global-hl-line-mode 1)
 #+end_src
 Function run after each command (via a hook added in [[id:6b3719c9-87d2-4b92-8998-3a9bc163a2a9][Org options]]) to set cursor to box for fixed pitch faces and bar for variable.
@@ -123,7 +130,7 @@ Function run after each command (via a hook added in [[id:6b3719c9-87d2-4b92-899
   (global-completion-preview-mode 1)
   (define-key completion-preview-active-mode-map (kbd "M-n") 'completion-preview-next-candidate)
   (define-key completion-preview-active-mode-map (kbd "M-p") 'completion-preview-prev-candidate)
-  (define-key completion-preview-active-mode-map (kbd "RET") 'completion-preview-insert)
+;;  (define-key completion-preview-active-mode-map (kbd "RET") 'completion-preview-insert)
 #+end_src
 ** Close parens, quotes, etc.
 #+begin_src emacs-lisp
@@ -217,8 +224,12 @@ Custom mode line.
   	org-id-link-to-org-use-id t
   	org-return-follows-link t
   	org-tab-follows-link t
-  	org-cycle-emulate-tab 'whitestart
-  	org-agenda-files '("~/Dropbox/org/life.org"))
+  	org-cycle-emulate-tab t
+  	org-id-link-to-org-use-id 'use-existing
+  	org-agenda-files '("~/Dropbox/org/life.org")
+  	org-refile-targets '((org-agenda-files :maxlevel . 9))
+  	org-refile-use-outline-path t
+  	org-outline-path-complete-in-steps nil)
 #+end_src
 When org starts, set monospaced faces (using lists set in [[*Frame options][Frame options]]) and run the function defined in [[id:29773854-7007-4d58-9734-44942486fa55][Cursor options]] after each command to change the cursor type.
 #+begin_src emacs-lisp
@@ -241,6 +252,44 @@ When org starts, set monospaced faces (using lists set in [[*Frame options][Fram
                   completion-preview-complete)))
 
   (add-hook 'org-mode-hook 'leanmc-org-mode-hook)
+#+end_src
+~org-capture~ settings
+#+begin_src emacs-lisp
+  (setq org-capture-templates
+        '(("g" "Add an item to a grocery list")
+  	("gs" "Add an item to the Safeway grocery list" checkitem (file+headline "~/Dropbox/org/life.org" "Safeway") "[ ] %?")
+  	("gc" "Add an item to the Costco grocery list" checkitem (file+headline "~/Dropbox/org/life.org" "Costco") "[ ] %?")
+  	("gt" "Add an item to the Target grocery list" checkitem (file+headline "~/Dropbox/org/life.org" "Target") "[ ] %?")
+  	("gj" "Add an item to the TJs grocery list" checkitem (file+headline "~/Dropbox/org/life.org" "TJs") "[ ] %?")
+  	("ga" "Add an item to the Amazon grocery list" checkitem (file+headline "~/Dropbox/org/life.org" "Amazon") "[ ] %?")
+  	("go" "Add an item to the Other grocery list" checkitem (file+headline "~/Dropbox/org/life.org" "Other") "[ ] %?")
+  	("j" "Journal" entry (file+olp+datetree "~/Dropbox/org/life.org" "journal") "* %<%l:%M%p>\n%?")
+  	("w" "Add a work item")
+  	("wc" "Add class plans" plain (file+olp+datetree "~/Dropbox/org/life.org" "work" "2025-26 (5/6, marshall)" "class plans") "\n%?")
+  	("wp" "Add PD notes" plain (file+olp+datetree "~/Dropbox/org/life.org" "work" "2025-26 (5/6, marshall)" "pd notes") "\n%?")
+  	("t" "Schedule an TODO")
+  	("tf" "Schedule a financial TODO" entry (file+olp "~/Dropbox/org/life.org" "finances" "TODOs") "* TODO %?\nSCHEDULED: %^T")
+  	("tw" "Schedule a work TODO" entry (file+olp "~/Dropbox/org/life.org" "work" "TODOs") "* TODO %?\nSCHEDULED: %^T")
+  	("tl" "Schedule a legal TODO" entry (file+olp "~/Dropbox/org/life.org" "legal" "TODOs") "* TODO %?\nSCHEDULED: %^T")
+  	("th" "Schedule a health TODO" entry (file+olp "~/Dropbox/org/life.org" "health" "TODOs") "* TODO %?\nSCHEDULED: %^T")
+  	("tp" "Schedule a parenting TODO" entry (file+olp "~/Dropbox/org/life.org" "parenting" "TODOs") "* TODO %?\nSCHEDULED: %^T")
+  	("to" "Schedule another type of TODO" entry (file+olp "~/Dropbox/org/life.org" "other" "TODOs") "* TODO %?\nSCHEDULED: %^T")))
+#+end_src
+~org-babel~ stuff
+#+begin_src emacs-lisp
+  (use-package org-contrib)
+  (org-babel-do-load-languages
+   'org-babel-load-languages
+   '((ledger . t)
+     (emacs-lisp . t)
+     (latex . t)
+     (shell . t)
+     ))
+#+end_src
+** LaTeX
+#+begin_src emacs-lisp
+  (use-package auctex)
+  (use-package latex-preview-pane)
 #+end_src
 ** Ledger options
 #+begin_src emacs-lisp
@@ -282,5 +331,9 @@ When org starts, set monospaced faces (using lists set in [[*Frame options][Fram
   	erc-hide-list
   	'("JOIN" "PART" "QUIT")
   	erc-track-exclude-types '("JOIN" "MODE" "NICK" "PART" "QUIT"
-  				  "324" "329" "332" "333" "353" "477"))
+  				  "324" "329" "332" "333" "353" "477")
+  	erc-sasl-nick "nick"
+  	erc-sasl-user "user"
+  	erc-sasl-password "a_password"
+  	erc-server-auth-method 'sasl)
 #+end_src

@@ -1,63 +1,111 @@
-* early-init.el
+#+PROPERTY: header-args :tangle "~/.emacs.d/init.el"
+* Frame
 :PROPERTIES:
 :header-args: :tangle "~/.emacs.d/early-init.el"
 :END:
-** Package management
+These options are added to ~early-init.el~ because they affect the initial frame, including dimensions, toolbars, etc.
+
+Run fullscreen, and set a default font by adding values to ~default-frame-alist~ and ~initial-frame-alist~.
 #+begin_src emacs-lisp
-  (require 'package)
-  (require 'use-package-ensure)
-  (add-to-list 'package-archives '("melpa" . "https://melpa.org/packages/") t)
-  (package-initialize)
-  (setopt use-package-always-ensure t)
-  (unless package-archive-contents
-    (package-refresh-contents))
-#+end_src
-* init.el
-:PROPERTIES:
-:header-args: :tangle "~/.emacs.d/init.el"
-:END:
-** Frame options
-:PROPERTIES:
-:ID:       f96ed644-792c-40ea-85f5-92f04b4e3ff6
-:END:
-#+begin_src emacs-lisp
-  (setq leanmc-default-font "IBM Plex Mono-20")
-  (setq leanmc-variable-pitch-font "IBM Plex Serif-22")
+  (setq leanmc-default-font "Iosevka-20")
   (dolist (x
   	 `((fullscreen . fullboth)
   	   (font . ,leanmc-default-font)))
     (add-to-list 'default-frame-alist x)
     (add-to-list 'initial-frame-alist x))
-  (use-package solarized-theme)
-  (use-package zenburn-theme)
-  (use-package color-theme-sanityinc-tomorrow)
-  (use-package dracula-theme)
-  (use-package gruvbox-theme)
-  (use-package doom-themes)
 #+end_src
-These lists track faces that should use a monospaced font, for use in [[id:29773854-7007-4d58-9734-44942486fa55][Cursor options]] and in [[id:6b3719c9-87d2-4b92-8998-3a9bc163a2a9][Org options]].
+
+I don't really use the startup screen, scroll bars, or tool bars. I keep the menus on in macOS because the menu bar doesn't disappear so I may as well fill it with stuff, even though I'll probably never use it.
 #+begin_src emacs-lisp
-  (setq fixed-general-faces
-        '(line-number
-  	org-checkbox
-  	org-code
-  	org-document-info
-  	org-document-title
-  	org-date
-  	org-property-value
-  	org-table
-  	org-formula
-  	org-block))
-  (setq fixed-shadow-faces
-        '(org-block-end-line
-  	org-document-info-keyword
-  	org-drawer
-  	org-meta-line
-  	org-special-keyword
-  	org-block-begin-line))
-  (setq fixed-faces (append fixed-general-faces fixed-shadow-faces))
+  (setopt inhibit-startup-screen t)
+  (if (not (eq system-type 'darwin)) (menu-bar-mode -1))
+  (scroll-bar-mode -1)
+  (tool-bar-mode -1)
 #+end_src
-** Ergonomics on macOS
+* Package manager
+I am am using ~package.el~ for now.
+#+begin_src emacs-lisp
+  (require 'package)
+#+end_src
+
+Many useful packages are hosted on MELPA, so I add that to the sources.
+#+begin_src emacs-lisp
+  (add-to-list 'package-archives '("melpa" . "https://melpa.org/packages/") t)
+#+end_src
+
+I also use ~use-package~, and especially appreciate it's ability to ensure packages are installed when I load my config on a new machine or emacs installation.
+#+begin_src emacs-lisp
+  (require 'use-package-ensure)
+  (setopt use-package-always-ensure t)
+#+end_src
+
+If ~package-archive-contents~ is empty (i.e. the package manager hasn't been synced with MELPA and other archives), sync up.
+#+begin_src emacs-lisp
+;;  (unless package-archive-contents
+;;    (package-refresh-contents))
+#+end_src
+* Fonts
+Set the ~fixed-pitch~ font to match the default.
+#+begin_src emacs-lisp
+  (set-face-font 'fixed-pitch leanmc-default-font)
+#+end_src
+
+Set the ~variable-pitch~ font.
+#+begin_src emacs-lisp
+  (set-face-font 'variable-pitch "CMU Serif-22")
+#+end_src
+
+In ~org-mode~, use ~variable-pitch-mode~.
+#+begin_src emacs-lisp
+  (add-hook 'org-mode-hook 'variable-pitch-mode)
+#+end_src
+* Completion
+Enable ~fido-vertical-mode~.
+#+begin_src emacs-lisp
+  (fido-vertical-mode 1)
+#+end_src
+
+Wrap around when selecting completion candidates.
+#+begin_src emacs-lisp
+  (setopt completion-auto-wrap t)
+#+end_src
+
+Display the ~*Completions*~ buffer when completion is requested but can't be done, keep it open thereafter, and update the list of completions on subsequent completion attempts.
+#+begin_src emacs-lisp
+  (setopt completion-auto-help 'visible)
+#+end_src
+
+Display completion candidates vertically.
+#+begin_src emacs-lisp
+  (setopt completions-format 'vertical)
+#+end_src
+
+Select the ~*Completions*~ buffer when tab is pressed after requesting completion.
+#+begin_src emacs-lisp
+  (setopt completion-auto-select 'second-tab)
+#+end_src
+
+Display details for completion candidates.
+#+begin_src emacs-lisp
+  (setopt completions-detailed t)
+#+end_src
+
+Enable ~completion-preview-mode~ globally.
+#+begin_src emacs-lisp
+  (global-completion-preview-mode 1)
+#+end_src
+
+Display completion previews when one or more characters are typed.
+#+begin_src emacs-lisp
+  (setopt completion-preview-minimum-symbol-length 1)
+#+end_src
+
+Automatically close quotes, parentheses, etc.
+#+begin_src emacs-lisp
+  (electric-pair-mode 1)
+#+end_src
+* Keyboard and bindings
+On macOS, I have found it useful to have the command key function as control, and option as meta. This way these commonly used keys are under my thumbs and I will hopefully not suffer RSI.
 #+begin_src emacs-lisp
   (when (eq system-type 'darwin)
     (setopt
@@ -65,8 +113,26 @@ These lists track faces that should use a monospaced font, for use in [[id:29773
      ns-option-modifier 'meta
      ns-control-modifier 'super))
 #+end_src
-** Flash modeline for system bell
-Instead of beeping audibly or flashing the entire frame, flash the modeline.
+
+Have ~C-x C-b~ open up ~ibuffer~.
+#+begin_src emacs-lisp
+  (global-set-key (kbd "C-x C-b") 'ibuffer)  
+#+end_src
+
+Allow ~M-n~ and ~M-p~ to cycle through completion preview candidates.
+#+begin_src emacs-lisp
+  (define-key completion-preview-active-mode-map (kbd "M-n") 'completion-preview-next-candidate)
+  (define-key completion-preview-active-mode-map (kbd "M-p") 'completion-preview-prev-candidate)
+#+end_src
+
+Have ~C-c a~, ~C-c c~, and ~C-c l~ run ~org-agenda~, ~org-capture~, and ~org-store-link~, respectively.
+#+begin_src emacs-lisp
+  (global-set-key (kbd "C-c a") 'org-agenda)
+  (global-set-key (kbd "C-c c") 'org-capture)
+  (global-set-key (kbd "C-c l") 'org-store-link)
+#+end_src
+* System bell
+I find it much more effective and less annoying to have the modeline flash instead of the system beeping at me when I'm doing something silly.
 #+begin_src emacs-lisp
   (defun flash-mode-line()
     (invert-face 'mode-line)
@@ -75,85 +141,38 @@ Instead of beeping audibly or flashing the entire frame, flash the modeline.
   (setopt visible-bell nil
   	ring-bell-function 'flash-mode-line)
 #+end_src
-** Hide the help
+* Line modes and numbers
+Always highlight the current line.
 #+begin_src emacs-lisp
-  (setopt inhibit-startup-screen t)
-  (if (not (eq system-type 'darwin)) (menu-bar-mode -1))
-  (scroll-bar-mode -1)
-  (tool-bar-mode -1)
-#+end_src
-** Line numbers
-#+begin_src emacs-lisp
-  (global-display-line-numbers-mode)
-  (setopt display-line-numbers-type 'visual
-  	display-line-numbers-width-start t)
-#+end_src
-** Cursor options
-:PROPERTIES:
-:ID:       29773854-7007-4d58-9734-44942486fa55
-:END:
-Red color. Never blink. Highlight the current line.
-#+begin_src emacs-lisp
-  (set-face-attribute 'cursor nil :background "red")
-  (setq blink-cursor-blinks 0)
   (global-hl-line-mode 1)
 #+end_src
-Function run after each command (via a hook added in [[id:6b3719c9-87d2-4b92-8998-3a9bc163a2a9][Org options]]) to set cursor to box for fixed pitch faces and bar for variable.
-#+begin_src emacs-lisp
-  (defun leanmc-sync-cursor-type-with-pitch ()
-    "Set cursor-type to box in fixed-pitch and bar in variable-pitch"
-    (let ((point-faces (get-text-property (point) 'face)))
-      (if (listp point-faces)
-  	(if (leanmc-list-intersect-p point-faces fixed-faces)
-  	    (setq cursor-type 'box)
-  	  (setq cursor-type 'bar))
-        (if (member point-faces fixed-faces)
-  	  (setq cursor-type 'box)
-  	(setq cursor-type 'bar)))))
 
-  (defun leanmc-list-intersect-p (list1 list2)
-    "Return non-nil if any elements of LIST1 appear in LIST2.
-  Comparison is done with `equal'."
-    (while (and list1 (not (member (car list1) list2)))
-      (pop list1))
-    list1)
-#+end_src
-** Completion options
+Use visual lines for numbering. Since I do a fair amount of writing long paragraphs with no line breaks, which results in multiple visual lines, I find this to be useful.
 #+begin_src emacs-lisp
-  (setopt completion-auto-wrap t
-    	completion-auto-help 'visible
-    	completions-max-height 15
-    	completions-format 'vertical
-    	completion-auto-select 'second-tab
-    	completions-detailed t)
-  (fido-vertical-mode 1)
-  (global-completion-preview-mode 1)
-  (define-key completion-preview-active-mode-map (kbd "M-n") 'completion-preview-next-candidate)
-  (define-key completion-preview-active-mode-map (kbd "M-p") 'completion-preview-prev-candidate)
-;;  (define-key completion-preview-active-mode-map (kbd "RET") 'completion-preview-insert)
+  (setopt display-line-numbers-type 'visual)
 #+end_src
-** Close parens, quotes, etc.
+
+Use ~visual-line-mode~ in ~text-mode~, because it is common to have long blocks of text without line breaks in these modes.
 #+begin_src emacs-lisp
-  (electric-pair-mode 1)
-#+end_src
-** Appearance
-Options for fixed and variable pitch fonts. Uses variables set in [[id:f96ed644-792c-40ea-85f5-92f04b4e3ff6][Frame options]].
-#+begin_src emacs-lisp
-  (set-face-font 'fixed-pitch leanmc-default-font)
-  (set-face-font 'variable-pitch leanmc-variable-pitch-font)
-  (add-hook 'text-mode-hook 'variable-pitch-mode)
   (add-hook 'text-mode-hook 'visual-line-mode)
-  (add-hook 'buffer-face-mode-hook
-  	  (lambda ()
-  	    (if buffer-face-mode
-  		(setq cursor-type 'bar)
-  	      (setq cursor-type 'box))))
 #+end_src
-Theme and its options.
+
+Make sure the fringe is wide enough to cover all of the digits of the biggest line number right away.
+#+begin_src emacs-lisp
+  (setopt display-line-numbers-width-start t)
+#+end_src
+
+Always show line numbers. I find them useful even in non-coding contexts.
+#+begin_src emacs-lisp
+  (global-display-line-numbers-mode)
+#+end_src
+* Theme
+I'm currently using and enjoying ~modus-vivendi-tinted~, with italic and bold constructs, bold prompts, mixed fonts (for e.g. ~org-mode~), and easily distinguished heading sizes (for e.g. ~org-mode~).
 #+begin_src emacs-lisp
   (setopt modus-themes-italic-constructs t
   	modus-themes-bold-constructs t
   	modus-themes-prompts '(bold)
+  	modus-themes-mixed-fonts t
   	modus-themes-headings
   	'((5 . (1.1))
   	  (4 . (1.2))
@@ -162,7 +181,44 @@ Theme and its options.
   	  (1 . (1.5))))
   (load-theme 'modus-vivendi-tinted)
 #+end_src
-Icons everywhere.
+* Cursor
+Set the cursor color to red, and have it always blink.
+#+begin_src emacs-lisp
+  (set-face-attribute 'cursor nil :background "red")
+  (setopt blink-cursor-blinks 0)
+#+end_src
+
+This function first checks if we are in ~buffer-face-mode~, better known as ~variable-pitch-mode~. If so, it gets the face(s) at point. If there are none, then we are dealing with the ~variable-pitch~ face, so the bar cursor is used. If there's just one face, it pulls the ~:font~ attribute from that face and compares it with that of the ~fixed-pitch~ face. If the attributes match, we use the box face, otherwise the bar. Finally, if there are multiple faces, only one of them should have a ~:font~ attribute, so it finds that face and does the same thing as the single-face case.
+#+begin_src emacs-lisp
+  (defun leanmc/sync-cursor-type-with-pitch ()
+    "Set the cursor-type to box when the font at point is fixed-pitch,
+  and bar when it is variable pitch"
+    (if buffer-face-mode
+        (let ((face-points (get-text-property (point) 'face)))
+  	(if (not face-points)
+  	    (setopt cursor-type 'bar)
+  	  (if (not (listp face-points))
+  	      (if (equal (face-attribute face-points :font nil t)
+  			 (face-attribute 'fixed-pitch :font nil t))
+  		  (setopt cursor-type 'box)
+  		(setopt cursor-type 'bar))
+  	    (dolist (face face-points)
+  	      (if (fontp (face-attribute face :font nil t))
+  		  (if (equal (face-attribute face :font nil t)
+  			     (face-attribute 'fixed-pitch :font nil t))
+  		      (setopt cursor-type 'box)
+  		    (setopt cursor-type 'bar)))))))
+      (setopt cursor-type 'box)))
+#+end_src
+
+In ~org-mode~, run the above function any time the cursor moves (actually, this runs it any time the user runs a command).
+#+begin_src emacs-lisp
+  (add-hook 'org-mode-hook
+  	  (lambda ()
+  	    (add-hook 'post-command-hook 'leanmc/sync-cursor-type-with-pitch)))
+#+end_src
+* Icons
+For pure aesthetics, I like having some icons. ~all-the-icons~ and its sub-packages are useful for this.
 #+begin_src emacs-lisp
   (use-package all-the-icons
     :if (display-graphic-p))
@@ -171,9 +227,6 @@ Icons everywhere.
     :after all-the-icons
     :hook (dired-mode . all-the-icons-dired-mode))
 
-  (add-hook 'dired-mode-hook 'dired-hide-details-mode)
-
-  (global-set-key (kbd "C-x C-b") 'ibuffer)
   (use-package all-the-icons-ibuffer
     :after all-the-icons
     :hook (ibuffer-mode . all-the-icons-ibuffer-mode))
@@ -182,12 +235,14 @@ Icons everywhere.
     :after all-the-icons
     :config (all-the-icons-completion-mode))
 #+end_src
-Custom mode line.
+* Modeline
+I have a custom modeline, with icons to indicate the major mode and file-edit status (unchanged, edited, or locked). I also include the buffer name and the current date and time. I have the edit status and buffer name on the left side, and the major mode with the date and time on the right.
 #+begin_src emacs-lisp
   (setopt display-time-default-load-average nil
   	display-time-day-and-date t
   	display-time-format "%a %m/%d at %I:%M%p")
   (display-time)
+  (line-number-mode -1)
   (let*
       ((modified-icon '(:eval
   		      (let* ((config-alist
@@ -202,108 +257,116 @@ Custom mode line.
   				    'face `(:family ,(funcall (car result)))))))
        (mode-icon '(:eval (propertize (all-the-icons-icon-for-mode major-mode)
   				    'help-echo (format "Major-mode: %s" major-mode)
-  				    'local-map mode-line-major-mode-keymap))))
+  				    'local-map mode-line-major-mode-keymap)))
+       (pos '(-3 "%p")))
     (setq-default mode-line-format `(" "
   				   ,modified-icon
   				   " "
+  				   ,pos
+  				   " of "
   				   ,mode-line-buffer-identification
+  				   " "
   				   mode-line-format-right-align
   				   ,mode-icon
   				   " "
   				   ,mode-line-misc-info
   				   " ")))
 #+end_src
-** Org options
-:PROPERTIES:
-:ID:       6b3719c9-87d2-4b92-8998-3a9bc163a2a9
-:END:
+* Dired
+Hide the details in ~dired~, I find them more overwhelming than useful.
 #+begin_src emacs-lisp
-  (setopt org-hide-emphasis-markers t
-  	org-startup-folded 'fold
-  	org-hide-block-startup t
-  	org-id-link-to-org-use-id t
-  	org-return-follows-link t
-  	org-tab-follows-link t
-  	org-cycle-emulate-tab t
-  	org-id-link-to-org-use-id 'use-existing
-  	org-agenda-files '("~/Dropbox/org/life.org")
-  	org-refile-targets '((org-agenda-files :maxlevel . 9))
-  	org-refile-use-outline-path t
-  	org-outline-path-complete-in-steps nil)
+  (add-hook 'dired-mode-hook 'dired-hide-details-mode)
 #+end_src
-When org starts, set monospaced faces (using lists set in [[*Frame options][Frame options]]) and run the function defined in [[id:29773854-7007-4d58-9734-44942486fa55][Cursor options]] after each command to change the cursor type.
+* Org mode
+I use one big ~org~ file for everything, thus use that file as my ~org-agenda-files~.
 #+begin_src emacs-lisp
-  (defun leanmc-org-mode-hook ()
-    (dolist (face fixed-general-faces)
-      (set-face-attribute face nil :inherit 'fixed-pitch))
-    (dolist (face fixed-shadow-faces)
-      (set-face-attribute face nil :inherit '(shadow fixed-pitch)))
-    (set-face-attribute 'org-verbatim nil :inherit '(org-quote fixed-pitch))
-    (add-hook 'post-command-hook 'leanmc-sync-cursor-type-with-pitch 0 t)
-    (define-key org-mode-map (kbd "C-c C-a") #'org-agenda)
-    (setq-local completion-preview-commands
-                '(;; self-insert-command
-                  org-self-insert-command
-                  insert-char
-                  ;; delete-backward-char
-                  org-delete-backward-char
-                  backward-delete-char-untabify
-                  analyze-text-conversion
-                  completion-preview-complete)))
+  (setopt org-agenda-files '("~/Dropbox/org/life.org"))
+#+end_src
 
-  (add-hook 'org-mode-hook 'leanmc-org-mode-hook)
+In agenda views, start with follow mode (i.e. selecting a TODO triggers another window to jump to the position of that TODO in the ~org~ file).
+#+begin_src emacs-lisp
+  (setopt org-agenda-start-with-follow-mode t)
 #+end_src
-~org-capture~ settings
+
+Start up folded.
+#+begin_src emacs-lisp
+  (setopt org-startup-folded 'fold)
+#+end_src
+
+When ~<TAB>~ is pressed somewhere other than a headline, don't run ~org-cycle~.
+#+begin_src emacs-lisp
+  (setopt org-cycle-emulate-tab t)
+#+end_src
+
+When ~<RET>~ or ~<TAB>~ is pressed and the cursor is over a link, follow it.
+#+begin_src emacs-lisp
+  (setopt org-return-follows-link t
+  	org-tab-follows-link t)
+#+end_src
+
+Don't show the markup, show the end result.
+#+begin_src emacs-lisp
+  (setopt org-hide-emphasis-markers t)
+#+end_src
+
+I use a small handful of ~org-capture~ templates.
 #+begin_src emacs-lisp
   (setq org-capture-templates
         '(("g" "Add an item to a grocery list")
-  	("gs" "Add an item to the Safeway grocery list" checkitem (file+headline "~/Dropbox/org/life.org" "Safeway") "[ ] %?")
-  	("gc" "Add an item to the Costco grocery list" checkitem (file+headline "~/Dropbox/org/life.org" "Costco") "[ ] %?")
-  	("gt" "Add an item to the Target grocery list" checkitem (file+headline "~/Dropbox/org/life.org" "Target") "[ ] %?")
-  	("gj" "Add an item to the TJs grocery list" checkitem (file+headline "~/Dropbox/org/life.org" "TJs") "[ ] %?")
-  	("ga" "Add an item to the Amazon grocery list" checkitem (file+headline "~/Dropbox/org/life.org" "Amazon") "[ ] %?")
-  	("go" "Add an item to the Other grocery list" checkitem (file+headline "~/Dropbox/org/life.org" "Other") "[ ] %?")
-  	("j" "Journal" entry (file+olp+datetree "~/Dropbox/org/life.org" "journal") "* %<%l:%M%p>\n%?")
-  	("w" "Add a work item")
-  	("wc" "Add class plans" plain (file+olp+datetree "~/Dropbox/org/life.org" "work" "2025-26 (5/6, marshall)" "class plans") "\n%?")
-  	("wp" "Add PD notes" plain (file+olp+datetree "~/Dropbox/org/life.org" "work" "2025-26 (5/6, marshall)" "pd notes") "\n%?")
-  	("t" "Schedule an TODO")
-  	("tf" "Schedule a financial TODO" entry (file+olp "~/Dropbox/org/life.org" "finances" "TODOs") "* TODO %?\nSCHEDULED: %^T")
-  	("tw" "Schedule a work TODO" entry (file+olp "~/Dropbox/org/life.org" "work" "TODOs") "* TODO %?\nSCHEDULED: %^T")
-  	("tl" "Schedule a legal TODO" entry (file+olp "~/Dropbox/org/life.org" "legal" "TODOs") "* TODO %?\nSCHEDULED: %^T")
-  	("th" "Schedule a health TODO" entry (file+olp "~/Dropbox/org/life.org" "health" "TODOs") "* TODO %?\nSCHEDULED: %^T")
-  	("tp" "Schedule a parenting TODO" entry (file+olp "~/Dropbox/org/life.org" "parenting" "TODOs") "* TODO %?\nSCHEDULED: %^T")
-  	("to" "Schedule another type of TODO" entry (file+olp "~/Dropbox/org/life.org" "other" "TODOs") "* TODO %?\nSCHEDULED: %^T")))
+          ("gs" "Add an item to the Safeway grocery list" checkitem (file+headline "~/Dropbox/org/life.org" "Safeway") "[ ] %?")
+          ("gc" "Add an item to the Costco grocery list" checkitem (file+headline "~/Dropbox/org/life.org" "Costco") "[ ] %?")
+          ("gt" "Add an item to the Target grocery list" checkitem (file+headline "~/Dropbox/org/life.org" "Target") "[ ] %?")
+          ("gj" "Add an item to the TJs grocery list" checkitem (file+headline "~/Dropbox/org/life.org" "TJs") "[ ] %?")
+          ("ga" "Add an item to the Amazon grocery list" checkitem (file+headline "~/Dropbox/org/life.org" "Amazon") "[ ] %?")
+          ("go" "Add an item to the Other grocery list" checkitem (file+headline "~/Dropbox/org/life.org" "Other") "[ ] %?")
+          ("j" "Journal" entry (file+olp+datetree "~/Dropbox/org/life.org" "journal") "* %<%l:%M%p>\n%?")
+          ("w" "Add a work item")
+          ("wc" "Add class plans" plain (file+olp+datetree "~/Dropbox/org/life.org" "work" "2025-26 (5/6, marshall)" "class plans") "\n%?")
+          ("wp" "Add PD notes" plain (file+olp+datetree "~/Dropbox/org/life.org" "work" "2025-26 (5/6, marshall)" "pd notes") "\n%?")
+          ("t" "Schedule an TODO")
+          ("tf" "Schedule a financial TODO" entry (file+olp "~/Dropbox/org/life.org" "finances" "TODOs") "* TODO %?\nSCHEDULED: %^T")
+          ("tw" "Schedule a work TODO" entry (file+olp "~/Dropbox/org/life.org" "work" "TODOs") "* TODO %?\nSCHEDULED: %^T")
+          ("tl" "Schedule a legal TODO" entry (file+olp "~/Dropbox/org/life.org" "legal" "TODOs") "* TODO %?\nSCHEDULED: %^T")
+          ("th" "Schedule a health TODO" entry (file+olp "~/Dropbox/org/life.org" "health" "TODOs") "* TODO %?\nSCHEDULED: %^T")
+          ("tp" "Schedule a parenting TODO" entry (file+olp "~/Dropbox/org/life.org" "parenting" "TODOs") "* TODO %?\nSCHEDULED: %^T")
+          ("to" "Schedule another type of TODO" entry (file+olp "~/Dropbox/org/life.org" "other" "TODOs") "* TODO %?\nSCHEDULED: %^T")))
+
 #+end_src
-~org-babel~ stuff
+
+When refiling, these options enable me to get to basically any location I want, with completion.
 #+begin_src emacs-lisp
-  (use-package org-contrib)
-  (org-babel-do-load-languages
-   'org-babel-load-languages
-   '((ledger . t)
-     (emacs-lisp . t)
-     (latex . t)
-     (shell . t)
-     ))
+  (setopt org-refile-targets '((org-agenda-files :maxlevel . 9))
+  	org-refile-use-outline-path t
+  	org-outline-path-complete-in-steps nil)
 #+end_src
-** LaTeX
+
+I am just geting started with ~ox-hugo~, and hope to use it to publish hopefully useful things on the web.
+#+begin_src emacs-lisp
+  (use-package ox-hugo
+    :pin melpa
+    :after ox)
+#+end_src
+* Latex
+I find ~auctex~ and ~latex-preview-pane~ to be very useful when I'm typesetting.
 #+begin_src emacs-lisp
   (use-package auctex)
   (use-package latex-preview-pane)
 #+end_src
-** Ledger options
+* Ledger
+I love ~ledger-mode~ for keeping track of my finances. It's truly fantastic, and has great integration with ~org-mode~.
 #+begin_src emacs-lisp
   (use-package ledger-mode
     :mode ("\\.dat\\'"
-  	 "\\.ledger\\'")
-    :config (when (eq system-type 'windows-nt) (setq ledger-binary-path "~/ledger.exe")))
+  	 "\\.ledger\\'"))
 #+end_src
-** Magit
+* Magit
+I am no coder, but I do use version control to track this file. Maybe I'll use it for other stuff later.
 #+begin_src emacs-lisp
   (setq auth-sources '("~/.authinfo"))
   (use-package magit)
 #+end_src
-** ERC
+* ERC
+These options make ERC somewhat functional for basic IRC usage. I don't use IRC much, but it's nice to get help with, oh say, my emacs config, for example. Some day I'll figure out how to properly store my credentials, but for now I just edit the tangled file.
 #+begin_src emacs-lisp
   (setopt erc-modules
   	'(autojoin

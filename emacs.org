@@ -167,11 +167,9 @@ I'm currently using and enjoying ~modus-themes~, with italic and bold constructs
 #+end_src
 Use ~auto-dark-emacs~ to automatically switch between ~modus-operandi~ and ~modus-vivendi~ in order to match the system's switching between light and dark themes which try to match... the sky.
 #+begin_src emacs-lisp
-  (use-package auto-dark
-    :config
-    (setq auto-dark-allow-osascript t)
-    (setq auto-dark-themes '((modus-vivendi-tinted) (modus-operandi-tinted)))
-    :init (auto-dark-mode))
+  (use-package auto-dark)
+  (setopt auto-dark-themes '((modus-vivendi-tinted) (modus-operandi-tinted)))
+  (auto-dark-mode)
 #+end_src
 * Cursor
 Always blink the cursor.
@@ -223,7 +221,55 @@ For pure aesthetics, I like having some icons. ~all-the-icons~ and its sub-packa
   ;;   :after all-the-icons
   ;;   :config (all-the-icons-completion-mode))
 #+end_src
-* Modeline
+* Mode line
+Here is a modified version of the function that formats right-aligned mode line content so that it (the function) takes the fringe into account.
+#+begin_src emacs-lisp
+  (defun mode--line-format-right-align ()
+    "Right-align all following mode-line constructs.
+
+  When the symbol `mode-line-format-right-align' appears in
+  `mode-line-format', return a string of one space, with a display
+  property to make it appear long enough to align anything after
+  that symbol to the right of the rendered mode line.  Exactly how
+  far to the right is controlled by `mode-line-right-align-edge'.
+
+  It is important that the symbol `mode-line-format-right-align' be
+  included in `mode-line-format' (and not another similar construct
+  such as `(:eval (mode-line-format-right-align)').  This is because
+  the symbol `mode-line-format-right-align' is processed by
+  `format-mode-line' as a variable."
+    (let* ((rest (cdr (memq 'mode-line-format-right-align
+  			  mode-line-format)))
+  	 (rest-str (format-mode-line `("" ,@rest)))
+  	 (rest-width (progn
+                         (add-face-text-property
+                          0 (length rest-str) 'mode-line t rest-str)
+                         (string-pixel-width rest-str))))
+      (propertize " " 'display
+  		;; The `right' spec doesn't work on TTY frames
+  		;; when windows are split horizontally (bug#59620)
+  		(if (and (display-graphic-p)
+                           (not (eq mode-line-right-align-edge 'window)))
+  		    `(space :align-to (- ,mode-line-right-align-edge
+                                           (,rest-width)))
+  		  `(space :align-to (,(- (window-pixel-width)
+                                           (window-scroll-bar-width)
+                                           (window-right-divider-width)
+                                           (* (or (car (window-margins)) 0)
+                                              (frame-char-width))
+  					 (car (window-fringes))
+                                           ;; Manually account for value of
+                                           ;; `mode-line-right-align-edge' even
+                                           ;; when display is non-graphical
+                                           (pcase mode-line-right-align-edge
+                                             ('right-margin
+                                              (or (cdr (window-margins)) 0))
+                                             ('right-fringe
+                                              ;; what here?
+                                              (or (cadr (window-fringes)) 0))
+                                             (_ 0))
+                                           rest-width)))))))
+#+end_src
 I have a custom modeline, with icons to indicate the major mode and file-edit status (unchanged, edited, or locked). I also include the buffer name and the current date and time. I have the edit status and buffer name on the left side, and the major mode with the date and time on the right.
 #+begin_src emacs-lisp
   (setopt display-time-default-load-average nil
@@ -303,8 +349,28 @@ Here I specify some helpful ~TODO~ keywords. I mostly just track state changes w
 #+begin_src emacs-lisp
   (setopt org-todo-keywords
   	'((sequence "TODO(t!)" "WAIT(@)" "|" "DONE(d!)")
-  	  (sequence "SCHE(s!)" "|" "COMP(c)" "CANC(n@)")
+  	  (sequence "SCHE(s!)" "|" "COMP(c!)" "CANC(n@)")
   	  (sequence "OWED(o!)" "|" "PAID(p!)")))
+#+end_src
+Here is some code, modified from [[https://fuco1.github.io/2017-09-02-Maximize-the-org-capture-buffer.html][this example]], that stores the window configuration, deletes other windows while an ~org-capture~ buffer is active, then restores the window configuration after the capture is finalized.
+#+begin_src emacs-lisp
+  (defvar leanmc/window-config nil
+    "Window configuration.")
+
+  (defun leanmc/org-capture--save-config (activate)
+    "Save the window configuration before `org-capture'."
+    (setq leanmc/window-config (current-window-configuration)))
+
+  (advice-add 'org-capture :before #'leanmc/org-capture--save-config)
+
+  (add-hook 'org-capture-mode-hook 'delete-other-windows)
+
+  (defun leanmc/org-capture--cleanup ()
+    "Restore the old window config."
+    (when leanmc/window-config
+      (set-window-configuration leanmc/window-config)))
+
+  (add-hook 'org-capture-after-finalize-hook 'leanmc/org-capture--cleanup)
 #+end_src
 I use a small handful of ~org-capture~ templates.
 #+begin_src emacs-lisp
@@ -316,7 +382,7 @@ I use a small handful of ~org-capture~ templates.
           ("wc" "Add class plans" plain (file+olp+datetree "" "work" "current year" "class plans") "\n%?" :time-prompt t)
           ("wp" "Add PD notes" plain (file+olp+datetree "" "work" "current year" "pd notes") "\n%?")
   	("wa" "Add a work appointment" entry (file+olp "" "work" "appointments") "* SCHE %?\nSCHEDULED: %^T")
-          ("tw" "Schedule a work TODO" entry (file+olp "" "work" "todos") "* TODO %?")
+  	("wt" "Add a work todo" entry (file+olp "" "work" "todos") "* TODO %?\n- State \"TODO\"\n%U")
   	("p" "Add a parenting item")
   	("pa" "Schedule a parenting appointment" entry (file+olp "" "parenting" "appointments") "* SCHE %?\nSCHEDULED: %^T")
   	("pt" "Add a parenting todo" entry (file+olp "" "parenting" "todos") "* TODO %?\n- State \"TODO\"\n%U")
@@ -337,9 +403,9 @@ I use a small handful of ~org-capture~ templates.
   	("l" "Add a legal item")
   	("la" "Schedule a legal appointment" entry (file+olp "" "legal" "appointments") "* SCHE %?\nSCHEDULED: %^T")
   	("lt" "Add a legal todo" entry (file+olp "" "legal" "todos") "* TODO %?\n- State \"TODO\"\n%U")
-  	("o" "Add an \"other\" type of item")
-  	("oa" "Schedule ao \"other\" appointment" entry (file+olp "" "other" "appointments") "* SCHE %?\nSCHEDULED: %^T")
-  	("ot" "Add a \"other\" todo" entry (file+olp "" "other" "todos") "* TODO %?\n- State \"TODO\"\n%U")))
+  	("h" "Add a home item")
+  	("ha" "Schedule a home appointment" entry (file+olp "" "home" "appointments") "* SCHE %?\nSCHEDULED: %^T")
+  	("ht" "Add home todo" entry (file+olp "" "home" "todos") "* TODO %?\n- State \"TODO\"\n%U")))
 #+end_src
 Have ~org-agenda-list~ start from today, rather than Monday.
 #+begin_src emacs-lisp
@@ -353,7 +419,7 @@ Icons instead of category names.
   	  ("work" ,(list (all-the-icons-faicon "briefcase" :width 2)))
   	  ("legal" ,(list (all-the-icons-faicon "gavel" :width 2)))
   	  ("finances" ,(list (all-the-icons-faicon "usd" :width 2)))
-  	  ("other" ,(list (all-the-icons-faicon "question-circle" :width 2)))))
+  	  ("home" ,(list (all-the-icons-faicon "home" :width 2)))))
   (setopt org-agenda-prefix-format '((agenda . " %i %?-12t") (todo . " %i ")
   				   (tags . " %i ") (search . " %i ")))
 #+end_src
@@ -398,6 +464,12 @@ I am just geting started with ~ox-hugo~, and hope to use it to publish hopefully
   (use-package ox-hugo
     :pin melpa
     :after ox)
+#+end_src
+Here I set some options to make math snippets load automatically and also look nice.
+#+begin_src emacs-lisp
+  (setopt org-startup-with-latex-preview t)
+  (setopt org-preview-latex-default-process 'dvisvgm)
+  (setopt org-format-latex-options (plist-put org-format-latex-options :scale 2.5))
 #+end_src
 * Latex
 I find ~auctex~ and ~latex-preview-pane~ to be very useful when I'm typesetting.

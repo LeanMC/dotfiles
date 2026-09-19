@@ -1,8 +1,14 @@
 #+PROPERTY: header-args :tangle "~/.emacs.d/init.el"
+#+begin_src emacs-lisp :padline no
+;; -*- lexical-binding: t; -*-
+#+end_src
 * early-init.el
 :PROPERTIES:
 :header-args: :tangle "~/.emacs.d/early-init.el"
 :END:
+#+begin_src emacs-lisp :padline no
+;; -*- lexical-binding: t; -*-
+#+end_src
 To speed up startup time, temporarily remove garbage collection limits.
 #+begin_src emacs-lisp
   (setopt gc-cons-threshold most-positive-fixnum)
@@ -13,10 +19,10 @@ To speed up startup time, temporarily remove garbage collection limits.
 ~early-init.el~ is a good place for options that affect the initial frame, including dimensions, toolbars, etc.
 This block tells Emacs to run fullscreen and set a default font by adding values to ~default-frame-alist~ and ~initial-frame-alist~, ensuring that this default font will be used in the first frame and any others that might be created later. It also tells Emacs to start in fullscreen and to omit titlebars and add rounded corners for any frames that end up not fullscreened.
 #+begin_src emacs-lisp
-  (setq leanmc-default-font "Iosevka-20")
+  (setq leanmc-default-font "JetBrains Mono-18")
   (dolist (x
   	 `((fullscreen . fullboth)
-  	   (undecorated-round . t)
+;;  	   (undecorated . t)
   	   (font . ,leanmc-default-font)))
     (add-to-list 'default-frame-alist x))
 #+end_src
@@ -29,6 +35,79 @@ I don't really use the startup screen, scroll bars, or tool bars, so here I disa
     (add-to-list 'default-frame-alist x))
   (setopt inhibit-startup-screen t)
 #+end_src
+* Auto-Saving
+These settings should hopefully avoid conflicts with edits made on other devices.
+#+begin_src emacs-lisp
+  (global-auto-revert-mode t)
+    (setq auto-revert-use-notify t
+        auto-revert-verbose nil
+        revert-without-query '("\\.\\(org\\|ledger\\)$"))
+
+  (setq auto-save-visited-mode t
+        auto-save-visited-interval 2)
+
+  (add-hook 'focus-out-hook 'org-save-all-org-buffers)
+  (add-hook 'before-disconnect-hook 'org-save-all-org-buffers)
+
+  (setq create-lockfiles nil)
+
+  (make-directory "~/.emacs.d/cache/backups/" t)
+  (make-directory "~/.emacs.d/cache/autosaves/" t)
+
+  (setq backup-directory-alist `(("." . "~/.emacs.d/cache/backups/"))
+        auto-save-file-name-transforms `((".*" "~/.emacs.d/cache/autosaves/" t)))
+#+end_src
+* Auto-Syncing
+These settings should automatically sync my =life.org= and =main.ledger= files, which live in =~/sync=.
+#+begin_src emacs-lisp
+  (defun leanmc/git-pull-sync-dir ()
+    "Silently pull the latest data from GitHub before loading files from ~/sync.
+  Includes a 3-second defensive network timeout to prevent editor lockups when offline."
+    (when (and buffer-file-name (string-prefix-p (expand-file-name "~/sync/") (expand-file-name buffer-file-name)))
+      (message "Syncing data from Private GitHub...")
+      (let ((exit-code (shell-command "timeout 3 git -C ~/sync pull --rebase origin main")))
+        (when (= exit-code 0)
+          (revert-buffer t t)))))
+
+  (add-hook 'find-file-hook #'leanmc/git-pull-sync-dir)
+
+  (defun leanmc/git-pull-on-focus ()
+    "Silently pull remote changes from GitHub the second you focus the Emacs window.
+    Utilizes a process sentinel to force a live reload the moment the network thread completes."
+    (when (and buffer-file-name 
+               (string-prefix-p (expand-file-name "~/sync/") (expand-file-name buffer-file-name)))
+      (message "Checking GitHub for mobile updates...")
+      (let ((proc (start-process-shell-command
+                   "git-auto-pull-on-focus" nil
+                   "timeout 3 git -C ~/sync pull --rebase origin main")))
+        ;; The Sentinel monitors the background thread and refreshes the screen on exit
+        (set-process-sentinel
+         proc
+         (lambda (process event)
+           (when (string= event "finished\n")
+             (let ((buf (get-file-buffer (expand-file-name "~/sync/life.org"))))
+               (when buf
+                 (with-current-buffer buf
+                   ;; Silently swap out old data for fresh iPhone edits instantly
+                   (revert-buffer t t)
+                   (message "Checking GitHub for mobile updates...done."))))))))))
+
+  (add-hook 'focus-in-hook #'leanmc/git-pull-on-focus)
+
+  (defun leanmc/git-save-and-push-sync-dir ()
+    "Silently stage, commit, and push changes to GitHub whenever files in ~/sync are saved."
+    (when (and buffer-file-name (string-prefix-p (expand-file-name "~/sync/") (expand-file-name buffer-file-name)))
+      (let ((file-name (file-name-nondirectory buffer-file-name)))
+        (message "Auto-committing %s to private cloud..." file-name)
+        (start-process-shell-command
+         "git-auto-sync" nil
+         (format "cd ~/sync && git add %s && git commit -m 'Auto-sync: updated %s' && git push origin main"
+                 (shell-quote-argument file-name)
+                 (shell-quote-argument file-name))))))
+
+  (add-hook 'after-save-hook #'leanmc/git-save-and-push-sync-dir)
+#+end_src
+
 * Theme
 I'm currently using and enjoying ~modus-themes~, with italic and bold constructs, bold prompts, mixed fonts (for e.g. ~org-mode~), and easily distinguished heading sizes (for e.g. ~org-mode~).
 #+begin_src emacs-lisp
@@ -46,32 +125,45 @@ I'm currently using and enjoying ~modus-themes~, with italic and bold constructs
 #+end_src
 Check system for dark mode and load the appropriate ~modus~ theme.
 #+begin_src emacs-lisp
-  (if (or
-       (and (eq system-type 'darwin)
-  	  (string-equal
-  	   "true"
-  	   (ns-do-applescript "tell application \"System Events\"
-          tell appearance preferences
-                  if (dark mode) then
-                          return \"true\"
-                  else
-                          return \"false\"
-                  end if
-          end tell
-  end tell")))
-       (and (eq system-type 'gnu/linux)
-  	  (string= (shell-command-to-string "gsettings get org.gnome.desktop.interface color-scheme") "\'prefer-dark\'\n")))
-  	(load-theme 'modus-vivendi-tinted)
-  	(load-theme 'modus-operandi-tinted))
+  (defun leanmc/set-theme (variant)
+    "Safely load either 'dark or 'light Modus theme variants."
+    (let ((target-theme (if (eq variant 'dark) 'modus-vivendi-tinted 'modus-operandi-tinted))
+          (active-theme (car custom-enabled-themes)))
+      (unless (eq active-theme target-theme)
+        (mapc #'disable-theme custom-enabled-themes)
+        (load-theme target-theme t))))
+
+  (defun leanmc/check-and-sync-system-theme ()
+    "Query the operating system theme and update Emacs to match."
+    (cond
+     ;; macOS Theme Check
+     ((eq system-type 'darwin)
+      (let ((style (shell-command-to-string "defaults read -g AppleInterfaceStyle 2>/dev/null")))
+        (if (string= style "Dark\n")
+            (leanmc/set-theme 'dark)
+          (leanmc/set-theme 'light))))
+     
+     ;; GNOME Linux Theme Check
+     ((eq system-type 'gnu/linux)
+      (let ((scheme (shell-command-to-string "gsettings get org.gnome.desktop.interface color-scheme")))
+        (if (string-match-p "prefer-dark" scheme)
+            (leanmc/set-theme 'dark)
+          (leanmc/set-theme 'light))))))
+
+  ;; 1. Run immediately on startup to set the correct theme instantly
+  (leanmc/check-and-sync-system-theme)
+
+  ;; 2. Check the system background state every 5 seconds for live switching
+  (run-with-timer 1 15 #'leanmc/check-and-sync-system-theme)
 #+end_src
-* Customize file
+* Customize File
 This saves configurations generated by the ~customize~ interface to a separate file.
 #+begin_src emacs-lisp
   (setopt custom-file (expand-file-name "custom.el" user-emacs-directory))
   (when (file-exists-p custom-file)
     (load custom-file))
 #+end_src
-* Package manager
+* Package Manager
 Use ~package.el~ for package management.
 #+begin_src emacs-lisp
   (require 'package)
@@ -140,7 +232,21 @@ Show the number of matches when using isearch.
 #+begin_src emacs-lisp
   (setq isearch-lazy-count t)
 #+end_src
-* Keyboard and bindings
+Some spelling stuff for macOS
+#+begin_src emacs-lisp
+  ;; Tell Emacs to use hunspell for spell checking
+  (setq ispell-program-name "hunspell")
+
+  ;; Force hunspell to look in your custom directory instead of system folders
+  (setenv "DICTIONARY" "en_US")
+  (setenv "DICPATH" (expand-file-name "~/.hunspell"))
+
+  ;; Initialize flyspell with the correct dictionary
+  (setq ispell-local-dictionary "en_US")
+  (setq ispell-local-dictionary-alist
+        '(("en_US" "[[:alpha:]]" "[^[:alpha:]]" "[']" nil ("-d" "en_US") nil utf-8)))
+#+end_src
+* Keyboard and Bindings
 On macOS, I have found it useful to have the command key function as control, and option as meta. This way these commonly used keys are under my thumbs and I will hopefully not suffer RSI.
 #+begin_src emacs-lisp
   (when (eq system-type 'darwin)
@@ -170,7 +276,7 @@ Enable ~which-key-mode~
 #+begin_src emacs-lisp
   (which-key-mode)
 #+end_src
-* System bell
+* System Bell
 I find it much more effective and less annoying to have the modeline flash instead of the system beeping at me when I'm doing something silly.
 #+begin_src emacs-lisp
   (defun flash-mode-line()
@@ -179,7 +285,7 @@ I find it much more effective and less annoying to have the modeline flash inste
   (setopt visible-bell nil
   	ring-bell-function 'flash-mode-line)
 #+end_src
-* Line modes and numbers
+* Line Modes and Numbers
 Always highlight the current line.
 #+begin_src emacs-lisp
   (global-hl-line-mode 1)
@@ -256,7 +362,7 @@ For pure aesthetics, I like having some icons. ~all-the-icons~ and its sub-packa
   ;;   :after all-the-icons
   ;;   :config (all-the-icons-completion-mode))
 #+end_src
-* Mode line
+* Mode Line
 Here is a modified version of the function that formats right-aligned mode line content so that it (the function) takes the fringe into account.
 #+begin_src emacs-lisp
   (defun mode--line-format-right-align ()
@@ -350,7 +456,7 @@ Make smart guesses about target directories.
 #+begin_src emacs-lisp
   (setopt dired-dwim-target t)
 #+end_src
-* Org mode
+* Org Mode
 Adding on to prettification: use ~olivetti-mode~.
 #+begin_src emacs-lisp
   (use-package olivetti
@@ -361,7 +467,7 @@ Adding on to prettification: use ~olivetti-mode~.
 #+end_src
 I use one big ~org~ file for everything, thus use that file as my ~org-agenda-files~.
 #+begin_src emacs-lisp
-  (setopt org-agenda-files '("~/Dropbox/org/life.org"))
+  (setopt org-agenda-files '("~/sync/life.org"))
 #+end_src
 Start up folded.
 #+begin_src emacs-lisp
@@ -440,9 +546,10 @@ I use a small handful of ~org-capture~ templates.
   	("l" "Add a legal item")
   	("la" "Schedule a legal appointment" entry (file+olp "" "legal" "appointments") "* SCHE %?\nSCHEDULED: %^T")
   	("lt" "Add a legal todo" entry (file+olp "" "legal" "todos") "* TODO %?\n- State \"TODO\"\n%U")
-  	("h" "Add a home item")
-  	("ha" "Schedule a home appointment" entry (file+olp "" "home" "appointments") "* SCHE %?\nSCHEDULED: %^T")
-  	("ht" "Add home todo" entry (file+olp "" "home" "todos") "* TODO %?\n- State \"TODO\"\n%U")))
+  	("lt" "Add a legal todo" entry (file+olp "" "legal" "todos") "* TODO %?\n- State \"TODO\"\n%U")
+  	("o" "Add a home item")
+  	("oa" "Schedule a home appointment" entry (file+olp "" "home" "appointments") "* SCHE %?\nSCHEDULED: %^T")
+  	("ot" "Add home todo" entry (file+olp "" "home" "todos") "* TODO %?\n- State \"TODO\"\n%U")))
 #+end_src
 Have ~org-agenda-list~ start from today, rather than Monday.
 #+begin_src emacs-lisp
@@ -463,8 +570,8 @@ Icons instead of category names.
 In the list of todos, ignore ones that will show up in the agenda anyway.
 #+begin_src emacs-lisp
   (setopt org-deadline-warning-days 7)
-  (setopt org-agenda-todo-ignore-deadlines 'near)
-  (setopt org-agenda-todo-ignore-scheduled 'all)
+;;  (setopt org-agenda-todo-ignore-deadlines 'near)
+;;  (setopt org-agenda-todo-ignore-scheduled 'all)
 #+end_src
 Run the agenda with no other windows, but restore other windows when done.
 #+begin_src emacs-lisp
@@ -501,59 +608,72 @@ Here I set some options to make math snippets load automatically and also look n
   (setopt org-preview-latex-default-process 'dvisvgm)
   (with-eval-after-load 'org  (plist-put org-format-latex-options :scale 2.5))
 #+end_src
+Add support for shell scripting with ~org-babel~.
+#+begin_src emacs-lisp
+  (org-babel-do-load-languages
+     'org-babel-load-languages
+  '((shell . t)))
+#+end_src
+Don't ask to confirm every time a source code block is executed.
+#+begin_src emacs-lisp
+  (setopt org-confirm-babel-evaluate nil)
+#+end_src
 Start emacs with the agenda and todo list.
 #+begin_src emacs-lisp
-  (defun emacs-startup-screen ()
-    "Display the weekly org-agenda and all todos."
-    (org-agenda nil "n"))
-  (add-hook 'emacs-startup-hook #'emacs-startup-screen)
+(defun emacs-startup-screen ()
+  "Display the weekly org-agenda and all todos."
+  (org-agenda nil "n"))
+(add-hook 'emacs-startup-hook #'emacs-startup-screen)
 #+end_src
 * Ledger
-I love ~ledger-mode~ for keeping track of my finances. It's truly fantastic, and has great integration with ~org-mode~.
+~ledger-mode~ makes keeping track of finances fun! Sometimes, ~ledger-mode~ can't find the right binary on macOS. ~exec-path-from-shell~ fixes that. Next up, set the columns wide (I have some granular account names) and auto-reconcile accounts that don't generate statements from institutions.
 #+begin_src emacs-lisp
+  (use-package exec-path-from-shell
+    :if (eq system-type 'darwin)
+    :config
+    (add-to-list 'exec-path-from-shell-variables "DICTIONARY")
+    (add-to-list 'exec-path-from-shell-variables "DICPATH")
+    (exec-path-from-shell-initialize))
+
   (use-package ledger-mode
     :mode ("\\.dat\\'"
-  	 "\\.ledger\\'"))
+           "\\.ledger\\'")
+    :init
+    (setq ledger-binary-path (executable-find "ledger"))
+    :config
+    (setq ledger-post-amount-alignment-column 81)
+
+    (defun leanmc/ledger-smart-clear-buffer-on-save ()
+      "Silently simulate pressing C-c C-c on targeted accounts before saving."
+      (save-excursion
+        (goto-char (point-min))
+        ;; Hunt down every single line matching your zero-statement accounts
+        (while (re-search-forward "^[ \t]+\\(Expenses:\\|Income:\\|Assets:Cash:\\|Assets:Digital:\\)" nil t)
+          (save-excursion
+            (forward-line 0)
+            ;; ONLY press C-c C-c if this line doesn't already have an asterisk
+            (unless (looking-at "^[ \t]+\\* ")
+              ;; Check if the parent transaction header is already cleared
+              (let ((header-cleared nil))
+                (save-excursion
+                  (ignore-errors
+                    (ledger-navigate-beginning-of-xact)
+                    (setq header-cleared (looking-at "^[0-9/.]+ [ \t]*\\*"))))
+                ;; Only toggle if the whole transaction isn't already fully cleared
+                (unless header-cleared
+                  (ignore-errors
+                    ;; Physically fire ledger's native toggle command on this line
+                    (ledger-toggle-current)))))))))
+
+    ;; 3. Bind the save hook EXCLUSIVELY and locally to ledger-mode buffers
+    (add-hook 'ledger-mode-hook
+              (lambda ()
+                (add-hook 'before-save-hook #'leanmc/ledger-smart-clear-buffer-on-save nil t))))
 #+end_src
 * Magit
 I am no coder, but I do use version control to track this file. Maybe I'll use it for other stuff later.
 #+begin_src emacs-lisp
-  (setq auth-sources '("~/.authinfo"))
   (use-package magit
       :bind ("C-x g" . magit-status))
 #+end_src
-* ERC
-These options make ERC somewhat functional for basic IRC usage. I don't use IRC much, but it's nice to get help with, oh say, my emacs config, for example. Some day I'll figure out how to properly store my credentials, but for now I just edit the tangled file.
-#+begin_src emacs-lisp
-  (setopt erc-modules
-  	'(autojoin
-  	  button
-  	  completion
-  	  fill
-  	  irccontrols
-  	  list
-  	  match
-  	  menu
-  	  move-to-prompt
-  	  netsplit
-  	  networks
-  	  noncommands
-  	  notifications
-  	  readonly
-  	  ring
-  	  sasl
-  	  spelling
-  	  stamp
-  	  track)
-  	erc-autojoin-channels-alist
-  	'(("libera.chat" "#emacs"))
-  	erc-autojoin-timing 'ident
-  	erc-hide-list
-  	'("JOIN" "PART" "QUIT")
-  	erc-track-exclude-types '("JOIN" "MODE" "NICK" "PART" "QUIT"
-  				  "324" "329" "332" "333" "353" "477")
-  	erc-sasl-nick "nick"
-  	erc-sasl-user "user"
-  	erc-sasl-password "a_password"
-  	erc-server-auth-method 'sasl)
-#+end_
+

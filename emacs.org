@@ -16,8 +16,7 @@ To speed up startup time, temporarily remove garbage collection limits.
   (add-hook 'emacs-startup-hook
             (lambda () (setopt gc-cons-threshold 800000) (setopt gc-cons-percentage 0.1)))
 #+end_src
-~early-init.el~ is a good place for options that affect the initial frame, including dimensions, toolbars, etc.
-This block tells Emacs to run fullscreen and set a default font by adding values to ~default-frame-alist~ and ~initial-frame-alist~, ensuring that this default font will be used in the first frame and any others that might be created later. It also tells Emacs to start in fullscreen and to omit titlebars and add rounded corners for any frames that end up not fullscreened.
+~early-init.el~ is a good place for options that affect the initial frame, including dimensions, toolbars, etc. This block tells Emacs to run fullscreen and set a default font by adding values to ~default-frame-alist~ and ~initial-frame-alist~, ensuring that this default font will be used in the first frame and any others that might be created later. It also tells Emacs to start in fullscreen and to omit titlebars and add rounded corners for any frames that end up not fullscreened.
 #+begin_src emacs-lisp
   (setq leanmc-default-font "JetBrains Mono-18")
   (dolist (x
@@ -39,47 +38,60 @@ I don't really use the startup screen, scroll bars, or tool bars, so here I disa
 These settings should hopefully avoid conflicts with edits made on other devices.
 #+begin_src emacs-lisp
   (global-auto-revert-mode t)
-    (setq auto-revert-use-notify t
-        auto-revert-verbose nil
-        revert-without-query '("\\.\\(org\\|ledger\\)$"))
+  (setopt auto-revert-use-notify t  
+  	revert-without-query '("\\.\\(org\\|ledger\\)$")
+  	auto-save-visited-mode t
+  	auto-save-visited-interval 2)
 
-  (setq auto-save-visited-mode t
-        auto-save-visited-interval 2)
+  (add-hook 'focus-out-hook (lambda () (save-some-buffers t)))
+  (add-hook 'before-disconnect-hook (lambda () (save-some-buffers t)))
 
-  (add-hook 'focus-out-hook 'org-save-all-org-buffers)
-  (add-hook 'before-disconnect-hook 'org-save-all-org-buffers)
-
-  (setq create-lockfiles nil)
+  (setopt create-lockfiles nil)
 
   (make-directory "~/.emacs.d/cache/backups/" t)
   (make-directory "~/.emacs.d/cache/autosaves/" t)
 
-  (setq backup-directory-alist `(("." . "~/.emacs.d/cache/backups/"))
-        auto-save-file-name-transforms `((".*" "~/.emacs.d/cache/autosaves/" t)))
+  (setopt backup-directory-alist `(("." . "~/.emacs.d/cache/backups/"))
+  	auto-save-file-name-transforms `((".*" "~/.emacs.d/cache/autosaves/" t)))
 #+end_src
 * Auto-Syncing
 These settings should automatically sync my =life.org= and =main.ledger= files, which live in =~/sync=.
 #+begin_src emacs-lisp
+  (defvar leanmc/is-syncing nil
+    "Internal safety toggle to prevent recursive revert loops during git operations.")
+
   (defun leanmc/git-pull-sync-dir ()
     "Silently pull the latest data from GitHub before loading files from ~/sync.
-  Includes a 3-second defensive network timeout to prevent editor lockups when offline."
-    (when (and buffer-file-name (string-prefix-p (expand-file-name "~/sync/") (expand-file-name buffer-file-name)))
-      (message "Syncing data from Private GitHub...")
-      (let ((exit-code (shell-command "timeout 3 git -C ~/sync pull --rebase origin main")))
+    Includes a 3-second defensive network timeout to prevent editor lockups when offline."
+    (when (and buffer-file-name 
+               (not leanmc/is-syncing) ; Circuit breaker check
+               (string-prefix-p (expand-file-name "~/sync/") (expand-file-name buffer-file-name)))
+      (message "Syncing from GitHub...")
+      (let* ((ssh-cmd "ssh -o ConnectTimeout=3 -o StrictHostKeyChecking=accept-new")
+             (process-environment (cons (concat "GIT_SSH_COMMAND=" ssh-cmd) process-environment))
+             (exit-code (shell-command "timeout 3 git -C ~/sync pull --rebase origin main")))
         (when (= exit-code 0)
-          (revert-buffer t t)))))
+          (setq leanmc/is-syncing t) ; Activate breaker before reverting
+          (unwind-protect
+              ;; Saves visibility maps & folded subtrees safely during structural reloads
+              (org-save-outline-visibility t
+                (revert-buffer t t))
+            (setq leanmc/is-syncing nil)))))) ; Safely reset breaker afterwards
 
   (add-hook 'find-file-hook #'leanmc/git-pull-sync-dir)
 
   (defun leanmc/git-pull-on-focus ()
     "Silently pull remote changes from GitHub the second you focus the Emacs window.
-    Utilizes a process sentinel to force a live reload the moment the network thread completes."
+      Utilizes a process sentinel to force a live reload the moment the network thread completes."
     (when (and buffer-file-name 
+               (not leanmc/is-syncing) ; Circuit breaker check
                (string-prefix-p (expand-file-name "~/sync/") (expand-file-name buffer-file-name)))
-      (message "Checking GitHub for mobile updates...")
-      (let ((proc (start-process-shell-command
-                   "git-auto-pull-on-focus" nil
-                   "timeout 3 git -C ~/sync pull --rebase origin main")))
+      (message "Checking GitHub for updates...")
+      (let* ((ssh-cmd "ssh -o ConnectTimeout=3 -o StrictHostKeyChecking=accept-new")
+             (process-environment (cons (concat "GIT_SSH_COMMAND=" ssh-cmd) process-environment))
+             (proc (start-process-shell-command
+                    "git-auto-pull-on-focus" nil
+                    "timeout 3 git -C ~/sync pull --rebase origin main")))
         ;; The Sentinel monitors the background thread and refreshes the screen on exit
         (set-process-sentinel
          proc
@@ -88,26 +100,31 @@ These settings should automatically sync my =life.org= and =main.ledger= files, 
              (let ((buf (get-file-buffer (expand-file-name "~/sync/life.org"))))
                (when buf
                  (with-current-buffer buf
-                   ;; Silently swap out old data for fresh iPhone edits instantly
-                   (revert-buffer t t)
-                   (message "Checking GitHub for mobile updates...done."))))))))))
+                   (setq leanmc/is-syncing t) ; Activate breaker
+                   (unwind-protect
+                       ;; Protects open/closed header layouts upon desktop window re-focus
+                       (org-save-outline-visibility t
+                         (revert-buffer t t))
+                     (setq leanmc/is-syncing nil))
+                   (message "Checking GitHub for updates...done."))))))))))
 
   (add-hook 'focus-in-hook #'leanmc/git-pull-on-focus)
 
   (defun leanmc/git-save-and-push-sync-dir ()
     "Silently stage, commit, and push changes to GitHub whenever files in ~/sync are saved."
     (when (and buffer-file-name (string-prefix-p (expand-file-name "~/sync/") (expand-file-name buffer-file-name)))
-      (let ((file-name (file-name-nondirectory buffer-file-name)))
-        (message "Auto-committing %s to private cloud..." file-name)
+      (let* ((file-name (file-name-nondirectory buffer-file-name))
+             (ssh-cmd "ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=accept-new")
+             (process-environment (cons (concat "GIT_SSH_COMMAND=" ssh-cmd) process-environment)))
+        (message "Committing %s to GitHub..." file-name)
+        (shell-command-to-string (format "cd ~/sync && git add %s && git commit -m 'update from picard'"
+  				       (shell-quote-argument file-name)))
         (start-process-shell-command
          "git-auto-sync" nil
-         (format "cd ~/sync && git add %s && git commit -m 'Auto-sync: updated %s' && git push origin main"
-                 (shell-quote-argument file-name)
-                 (shell-quote-argument file-name))))))
+         (format "cd ~/sync && git push origin main")))))
 
   (add-hook 'after-save-hook #'leanmc/git-save-and-push-sync-dir)
 #+end_src
-
 * Theme
 I'm currently using and enjoying ~modus-themes~, with italic and bold constructs, bold prompts, mixed fonts (for e.g. ~org-mode~), and easily distinguished heading sizes (for e.g. ~org-mode~).
 #+begin_src emacs-lisp
@@ -517,39 +534,56 @@ I use a small handful of ~org-capture~ templates.
 #+begin_src emacs-lisp
   (setopt org-default-notes-file (car org-agenda-files))
   (setq org-capture-templates
-        '(
-          ("j" "Journal" entry (file+olp+datetree "" "journal") "* %<%l:%M%p>\n%?")
-          ("w" "Add a work item")
-          ("wc" "Add class plans" entry (file+olp+datetree "" "work" "current year" "class plans")
-  	 "** 09:00-09:30\n** 09:30-10:50\n** 10:50-11:00\nRecess\n** 11:00-11:30\nRead Harry Potter ([[https://drive.google.com/file/d/1AiM76py_nPhOXu9KdKFoYCIBqnr5tT0h/view?usp=sharing][click here]]). We are on page %? of the linked PDF. They are allowed to snack during this time, but they should be reminded that if they leave a mess this privilege will be revoked.\n** 11:30-12:00\nSIPPS.\n** 12:00-12:45\n** 12:45-1:25\nLunch\n** 1:25-2:22\n** 2:22-3:07" :time-prompt t)
-          ("wp" "Add PD notes" plain (file+olp+datetree "" "work" "current year" "pd notes") "\n%?")
-  	("wa" "Add a work appointment" entry (file+olp "" "work" "appointments") "* SCHE %?\nSCHEDULED: %^T")
-  	("wt" "Add a work todo" entry (file+olp "" "work" "todos") "* TODO %?\n- State \"TODO\"\n%U")
-  	("p" "Add a parenting item")
-  	("pa" "Schedule a parenting appointment" entry (file+olp "" "parenting" "appointments") "* SCHE %?\nSCHEDULED: %^T")
-  	("pt" "Add a parenting todo" entry (file+olp "" "parenting" "todos") "* TODO %?\n- State \"TODO\"\n%U")
-  	("pn" "Add a parenting note" plain (file+olp+datetree "" "parenting" "notes") "*%<%l:%M%p>*\n%?")
-  	("g" "Add an item to a grocery list")
-          ("gc" "Add an item to the Costco grocery list" checkitem (file+headline "" "Costco") "[ ] %?")
-          ("gt" "Add an item to the Target grocery list" checkitem (file+headline "" "Target") "[ ] %?")
-          ("ga" "Add an item to the Amazon grocery list" checkitem (file+headline "" "Amazon") "[ ] %?")
-          ("gj" "Add an item to the TJs grocery list" checkitem (file+headline "" "TJs") "[ ] %?")
-          ("gs" "Add an item to the Safeway grocery list" checkitem (file+headline "" "Safeway") "[ ] %?")
-          ("go" "Add an item to the Other grocery list" checkitem (file+headline "" "Other") "[ ] %?")
-  	("h" "Add a health item")
-  	("ha" "Schedule a health appointment" entry (file+olp "" "health" "appointments") "* SCHE %?\nSCHEDULED: %^T")
-  	("ht" "Add a health todo" entry (file+olp "" "health" "todos") "* TODO %?\n- State \"TODO\"\n%U")
-  	("f" "Add a financial item")
-  	("fd" "Add a new debt" entry (file+olp "" "finances" "debts") "* OWED %?\n- State \"OWED\"\n%U")
-          ("fa" "Schedule a financial appointment" entry (file+olp "" "finances" "appointments") "* SCHE %?\nSCHEDULED: %^T")
-  	("ft" "Add a financial todo" entry (file+olp "" "finances" "todos") "* TODO %?\n- State \"TODO\"\n%U")
-  	("l" "Add a legal item")
-  	("la" "Schedule a legal appointment" entry (file+olp "" "legal" "appointments") "* SCHE %?\nSCHEDULED: %^T")
-  	("lt" "Add a legal todo" entry (file+olp "" "legal" "todos") "* TODO %?\n- State \"TODO\"\n%U")
-  	("lt" "Add a legal todo" entry (file+olp "" "legal" "todos") "* TODO %?\n- State \"TODO\"\n%U")
-  	("o" "Add a home item")
-  	("oa" "Schedule a home appointment" entry (file+olp "" "home" "appointments") "* SCHE %?\nSCHEDULED: %^T")
-  	("ot" "Add home todo" entry (file+olp "" "home" "todos") "* TODO %?\n- State \"TODO\"\n%U")))
+      '(
+        ("j" "Journal" entry (file+olp+datetree "" "journal") "* %<%l:%M%p>\n%?")
+        ("w" "Add a work item")
+        ("wc" "Add class plans" entry (file+olp+datetree "" "work" "current year" "class plans")
+         "** 09:00-10:00\n** 10:00-10:45\n** 10:50-11:00\nRecess\n** 11:00-12:45\n** 12:45-1:25\nLunch\n** 1:25-2:10\n** 2:10-3:07" :time-prompt t)
+        ("wp" "Add PD notes" plain (file+olp+datetree "" "work" "current year" "pd notes") "\n%?")
+        ("wa" "Add a work appointment" entry (file+olp "" "work" "appointments")
+         "* SCHE %?\nSCHEDULED: %^T\n:LOGBOOK:\n- State \"SCHE\"       from              %U\n:END:")
+        ("wt" "Add a work todo" entry (file+olp "" "work" "todos")
+         "* TODO %?\n:LOGBOOK:\n- State \"TODO\"       from              %U\n:END:")
+        ("p" "Add a parenting item")
+        ("pa" "Schedule a parenting appointment" entry (file+olp "" "parenting" "appointments")
+         "* SCHE %?\nSCHEDULED: %^T\n:LOGBOOK:\n- State \"SCHE\"       from              %U\n:END:")
+        ("pt" "Add a parenting todo" entry (file+olp "" "parenting" "todos")
+         "* TODO %?\n:LOGBOOK:\n- State \"TODO\"       from              %U\n:END:")
+        ("pn" "Add a parenting note" entry (file+olp+datetree "" "parenting" "notes") "* %<%l:%M%p>\n%?")
+        ("g" "Add an item to a grocery list")
+        ("gc" "Add an item to the Costco grocery list" checkitem (file+headline "" "Costco") "[ ] %?")
+        ("gt" "Add an item to the Target grocery list" checkitem (file+headline "" "Target") "[ ] %?")
+        ("ga" "Add an item to the Amazon grocery list" checkitem (file+headline "" "Amazon") "[ ] %?")
+        ("gj" "Add an item to the TJs grocery list" checkitem (file+headline "" "TJs") "[ ] %?")
+        ("gs" "Add an item to the Safeway grocery list" checkitem (file+headline "" "Safeway") "[ ] %?")
+        ("go" "Add an item to the Other grocery list" checkitem (file+headline "" "Other") "[ ] %?")
+        ("h" "Add a health item")
+        ("ha" "Schedule a health appointment" entry (file+olp "" "health" "appointments")
+         "* SCHE %?\nSCHEDULED: %^T\n:LOGBOOK:\n- State \"SCHE\"       from              %U\n:END:")
+        ("ht" "Add a health todo" entry (file+olp "" "health" "todos")
+         "* TODO %?\n:LOGBOOK:\n- State \"TODO\"       from              %U\n:END:")
+        ("f" "Add a financial item")
+        ("fd" "Add a new debt" entry (file+olp "" "finances" "debts")
+         "* OWED %?\n:LOGBOOK:\n- State \"OWED\"       from              %U\n:END:")
+        ("fa" "Schedule a financial appointment" entry (file+olp "" "finances" "appointments")
+         "* SCHE %?\nSCHEDULED: %^T\n:LOGBOOK:\n- State \"SCHE\"       from              %U\n:END:")
+        ("ft" "Add a financial todo" entry (file+olp "" "finances" "todos")
+         "* TODO %?\n:LOGBOOK:\n- State \"TODO\"       from              %U\n:END:")
+        ("l" "Add a legal item")
+        ("la" "Schedule a legal appointment" entry (file+olp "" "legal" "appointments")
+         "* SCHE %?\nSCHEDULED: %^T\n:LOGBOOK:\n- State \"SCHE\"       from              %U\n:END:")
+        ("lt" "Add a legal todo" entry (file+olp "" "legal" "todos")
+         "* TODO %?\n:LOGBOOK:\n- State \"TODO\"       from              %U\n:END:")
+        ("o" "Add a home item")
+        ("oa" "Schedule a home appointment" entry (file+olp "" "home" "appointments")
+         "* SCHE %?\nSCHEDULED: %^T\n:LOGBOOK:\n- State \"SCHE\"       from              %U\n:END:")
+        ("ot" "Add home todo" entry (file+olp "" "home" "todos")
+         "* TODO %?\n:LOGBOOK:\n- State \"TODO\"       from              %U\n:END:")))
+#+end_src
+Track state changes on TODO items.
+#+begin_src emacs-lisp
+  (setopt org-log-into-drawer t)
+  (setopt org-treat-insert-todo-heading-as-state-change t)
 #+end_src
 Have ~org-agenda-list~ start from today, rather than Monday.
 #+begin_src emacs-lisp
@@ -590,11 +624,11 @@ I find it convenient for properties to be inherited. Especially for export!
 #+end_src
 More often than not, I /don't/ want to export a TOC, the date, section numbers, or my name. I /do/ like smart quotes.
 #+begin_src emacs-lisp
-  (setopt org-export-with-toc nil)
-  (setopt org-export-with-date nil)
-  (setopt org-export-with-author nil)
-  (setopt org-export-with-section-numbers nil)
-  (setopt org-export-with-smart-quotes t)
+  (setopt org-export-with-toc nil
+  	org-export-with-date nil
+  	org-export-with-author nil
+  	org-export-with-section-numbers nil
+  	org-export-with-smart-quotes t)
 #+end_src
 I am just geting started with ~ox-hugo~, and hope to use it to publish hopefully useful things on the web.
 #+begin_src emacs-lisp
@@ -612,11 +646,14 @@ Add support for shell scripting with ~org-babel~.
 #+begin_src emacs-lisp
   (org-babel-do-load-languages
      'org-babel-load-languages
-  '((shell . t)))
+  '((shell . t)
+    (python .t)))
+  (setopt org-babel-python-command "python3")
 #+end_src
-Don't ask to confirm every time a source code block is executed.
+Don't ask to confirm every time a source code block is executed. And hide them by default!
 #+begin_src emacs-lisp
   (setopt org-confirm-babel-evaluate nil)
+  (setopt org-hide-block-startup t)
 #+end_src
 Start emacs with the agenda and todo list.
 #+begin_src emacs-lisp
@@ -669,6 +706,43 @@ Start emacs with the agenda and todo list.
     (add-hook 'ledger-mode-hook
               (lambda ()
                 (add-hook 'before-save-hook #'leanmc/ledger-smart-clear-buffer-on-save nil t))))
+#+end_src
+Here's some code to prompt for some variables and call a function that auto-generates a nice table to see how my finances are going.
+#+begin_src emacs-lisp
+    (defun leanmc/pivot-financial-dashboard ()
+    "Interactively prompt for financial parameters and instantly refresh the dashboard."
+    (interactive)
+    ;; save-window-excursion freezes your window arrangement so your eyes never lose focus
+    (save-window-excursion
+      (let* ((gran (completing-read "Select Granularity View: " '("1 - Birdseye" "2 - Granular Category" "3 - Micro Deep-Dive") nil t))
+             ;; FIXED: Using native Emacs 'substring' primitive to safely clip the first integer character
+             (gran-val (string-to-number (substring gran 0 1)))
+             (months (read-string "Months to Look Back: " "11"))
+             (cards (completing-read "Whitelist Financed Cards? " '("None" "Apple Card Only") nil t))
+             (cards-val (if (string= cards "Apple Card Only") 
+                            "['Liabilities:Credit-Cards:Apple']" 
+                          "[]")))
+        
+        ;; Open your life.org file invisibly in the background buffer pool
+        (with-current-buffer (find-file-noselect (expand-file-name "~/sync/life.org"))
+          (save-excursion
+            (goto-char (point-min))
+            (if (re-search-forward "#\\+NAME: dynamic-three-tier-history" nil t)
+                (progn
+                  (forward-line 1)
+                  (beginning-of-line)
+                  ;; Rewrite the block dynamic property attributes cleanly on the fly
+                  (delete-region (point) (line-end-position))
+                  (insert (format "#+begin_src python :results value :exports results :var granularity=%d months_back=%s financed_cards=\"%s\""
+                                  gran-val months cards-val))
+                  ;; Evaluate the underlying Python data pipeline streams instantly
+                  (org-babel-execute-src-block)
+                  (message "Financial Command Center updated successfully!"))
+              (error "Could not locate your 'dynamic-three-tier-history' code block layout.")))))))
+
+  ;; Re-bind this streamlined control deck engine to 'C-c f' for instant access
+  (global-set-key (kbd "C-c f") #'leanmc/pivot-financial-dashboard)
+
 #+end_src
 * Magit
 I am no coder, but I do use version control to track this file. Maybe I'll use it for other stuff later.
